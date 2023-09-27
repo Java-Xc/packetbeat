@@ -24,7 +24,6 @@ import (
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/packetbeat/procs"
 	conf "github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 type ProtocolPlugin func(
@@ -113,9 +112,6 @@ func Lookup(name string) Protocol {
 }
 
 func Register(name string, plugin ProtocolPlugin) {
-
-	logp.Info("Register %s start.", name)
-
 	proto := Protocol(len(protocolNames))
 	if p, exists := protocolSyms[name]; exists {
 		// keep symbol table entries if plugin gets overwritten

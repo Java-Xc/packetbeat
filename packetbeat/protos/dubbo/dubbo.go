@@ -147,7 +147,7 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	// 解析 Dubbo 数据包的逻辑
 	// 在这里处理 Dubbo 协议的解析逻辑
 	fmt.Println("解析 Dubbo 数据包:", pkt.Payload)
-	logp.Info(pkt.Payload)
+	logp.Info(string(pkt.Payload))
 
 	priv := dubboPrivateData{}
 
