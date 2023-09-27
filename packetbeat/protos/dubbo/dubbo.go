@@ -22,7 +22,6 @@ import (
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/packetbeat/procs"
 	"github.com/elastic/beats/v7/packetbeat/protos"
-	"github.com/elastic/beats/v7/packetbeat/protos/tcp"
 	conf "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"strings"
@@ -239,11 +238,10 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	dir uint8, private protos.ProtocolData,
 ) protos.ProtocolData {
 
-	if dir == tcp.TCPDirectionReverse {
-		// 解析 Dubbo 数据包的逻辑
-		// 在这里处理 Dubbo 协议的解析逻辑
-		fmt.Println("解析 Dubbo 数据包:", pkt.Payload)
-	}
+	// 解析 Dubbo 数据包的逻辑
+	// 在这里处理 Dubbo 协议的解析逻辑
+	fmt.Println("解析 Dubbo 数据包:", pkt.Payload)
+	logp.Info(pkt.Payload)
 
 	/*priv := dubboPrivateData{}
 	if private != nil {
