@@ -1,0 +1,52 @@
+- key: dubbo
+  title: "DUBBO"
+  description: DUBBO-specific event fields.
+  fields:
+    - name: dubbo
+      type: group
+      description: Information about the DUBBO request and response.
+      fields:
+        - name: request
+          description: DUBBO request
+          type: group
+          fields:
+            - name: headers
+              type: object
+              object_type: keyword
+              description: >
+                A map containing the captured header fields from the request.
+                Which headers to capture is configurable. If headers with the same
+                header name are present in the message, they will be separated by
+                commas.
+
+            - name: params
+              type: alias
+              migration: true
+              path: url.query
+
+        - name: response
+          description: DUBBO response
+          type: group
+          fields:
+            - name: status_phrase
+              description: The DUBBO status phrase.
+              example: Not Found
+
+            - name: headers
+              type: object
+              object_type: keyword
+              description: >
+                A map containing the captured header fields from the response.
+                Which headers to capture is configurable. If headers with the
+                same header name are present in the message, they will be separated
+                by commas.
+
+            - name: code
+              type: alias
+              migration: true
+              path: dubbo.response.status_code
+
+            - name: phrase
+              type: alias
+              migration: true
+              path: dubbo.response.status_phrase

@@ -139,6 +139,11 @@ packetbeat.protocols:
   # to tcp, it defaults to udp.
   #transport_protocol: tcp
 
+- type: dubbo
+  # Configure the ports where to listen for Dubbo traffic. You can disable
+  # the Dubbo protocol by commenting out the list of ports.
+  ports: [20880]
+
 # ======================= Elasticsearch template setting =======================
 
 setup.template.settings:
