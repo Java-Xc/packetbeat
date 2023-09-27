@@ -110,7 +110,6 @@ var (
 )
 
 func init() {
-	logp.Err("start register http")
 	protos.Register("http", New)
 }
 

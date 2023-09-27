@@ -62,7 +62,6 @@ type dubboPlugin struct {
 }
 
 func init() {
-	logp.Err("start register dubbo")
 	protos.Register("dubbo", New)
 }
 

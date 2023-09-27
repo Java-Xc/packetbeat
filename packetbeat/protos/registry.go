@@ -113,6 +113,9 @@ func Lookup(name string) Protocol {
 }
 
 func Register(name string, plugin ProtocolPlugin) {
+
+	logp.Info("Register %s start.", name)
+
 	proto := Protocol(len(protocolNames))
 	if p, exists := protocolSyms[name]; exists {
 		// keep symbol table entries if plugin gets overwritten
