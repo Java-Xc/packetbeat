@@ -59,10 +59,6 @@ type dubboPlugin struct {
 
 	results protos.Reporter
 	watcher *procs.ProcessesWatcher
-
-	// function pointer for mocking
-	handleDubbo func(dubbo *dubboPlugin, m *dubboMessage, tcp *common.TCPTuple,
-		dir uint8, raw_msg []byte)
 }
 
 func init() {
@@ -91,16 +87,11 @@ func New(
 
 func (dubbo *dubboPlugin) setFromConfig(config *dubboConfig) {
 	dubbo.ports = config.Ports
-	if config.SendRequest != nil {
-		dubbo.SendRequest = *config.SendRequest
-	}
-	if config.SendResponse != nil {
-		dubbo.SendResponse = *config.SendResponse
-	}
-	if config.TransactionTimeout != nil && *config.TransactionTimeout > 0 {
-		dubbo.transactionTimeout = time.Duration(*config.TransactionTimeout) * time.Second
-	}
+	dubbo.sendRequest = config.SendRequest
+	dubbo.sendResponse = config.SendResponse
+	dubbo.transactionTimeout = dubbo.TransactionTimeout
 }
+
 func (dubbo *dubboPlugin) GetPorts() []int {
 	return dubbo.ports
 }
@@ -109,7 +100,6 @@ func (dubbo *dubboPlugin) init(results protos.Reporter, watcher *procs.Processes
 	dubbo.setFromConfig(config)
 	dubbo.results = results
 	dubbo.watcher = watcher
-	dubbo.handleDubbo = handleDubbo
 
 	return nil
 }
@@ -121,32 +111,9 @@ func (dubbo *dubboPlugin) ConnectionTimeout() time.Duration {
 
 func dubboMessageParser(s *dubboStream) (bool, bool) {
 
-	// 检查是否是DUBBO被动模式响应
-	payload := string(pkt.Payload)
-	if strings.HasPrefix(payload, "227") {
-		// 解析被动模式响应中的IP和端口信息
-		ip, port, err := parsePasvResponse(payload)
-		if err != nil {
-			fmt.Println("Error parsing PASV response:", err)
-			return
-		}
-
-		// 建立数据连接并获取报文内容
-		data, err := fetchData(ip, port)
-		if err != nil {
-			fmt.Println("Error fetching data from passive mode:", err)
-			return
-		}
-
-		// 在这里，你可以处理获取到的DUBBO数据（data）
-		// 例如，打印报文内容
-		fmt.Println("DUBBO Passive Mode Data:", string(data))
-	}
-
 	return true, false
 }
 
-// 解析被动模式响应中的IP和端口信息
 func parsePasvResponse(response string) (string, int, error) {
 	// 解析响应中的IP和端口信息，通常位于括号中
 	start := strings.Index(response, "(")
@@ -187,25 +154,6 @@ func fetchData(ip string, port int) ([]byte, error) {
 	return data[:n], nil
 }
 
-func handleDubbo(dubbo *dubboPlugin, m *dubboMessage, tcptuple *common.TCPTuple,
-	dir uint8, rawMsg []byte,
-) {
-	m.tcpTuple = *tcptuple
-}
-
-// Called when the parser has identified a full message.
-func (dubbo *dubboPlugin) messageComplete(tcptuple *common.TCPTuple, dir uint8, stream *dubboStream) {
-	// all ok, ship it
-	msg := stream.data[stream.message.start:stream.message.end]
-
-	if !stream.message.ignoreMessage {
-		handleDubbo(dubbo, stream.message, tcptuple, dir, msg)
-	}
-
-	// and reset message
-	stream.prepareForNewMessage()
-}
-
 func (stream *dubboStream) prepareForNewMessage() {
 	stream.data = stream.data[stream.parseOffset:]
 	stream.parseOffset = 0
@@ -216,7 +164,6 @@ func (stream *dubboStream) prepareForNewMessage() {
 func (dubbo *dubboPlugin) GapInStream(tcptuple *common.TCPTuple, dir uint8,
 	nbytes int, private protos.ProtocolData) (priv protos.ProtocolData, drop bool,
 ) {
-	defer logp.Recover("GapInStream(dubbo) exception")
 
 	if private == nil {
 		return private, false
@@ -303,10 +250,6 @@ func (dubbo *dubboPlugin) messageComplete(tcptuple *common.TCPTuple, dir uint8, 
 
 	// all ok, ship it
 	msg := stream.data[stream.message.start:stream.message.end]
-
-	if !stream.message.ignoreMessage {
-		dubbo.handleDubbo(dubbo, stream.message, tcptuple, dir, msg)
-	}
 
 	// and reset message
 	stream.prepareForNewMessage()
