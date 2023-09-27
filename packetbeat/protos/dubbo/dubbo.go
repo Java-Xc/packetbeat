@@ -24,7 +24,6 @@ import (
 	"github.com/elastic/beats/v7/packetbeat/protos"
 	conf "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
-	"strings"
 	"time"
 )
 
@@ -114,46 +113,6 @@ func dubboMessageParser(s *dubboStream) (bool, bool) {
 	return true, false
 }
 
-func parsePasvResponse(response string) (string, int, error) {
-	// 解析响应中的IP和端口信息，通常位于括号中
-	start := strings.Index(response, "(")
-	end := strings.Index(response, ")")
-	if start != -1 && end != -1 {
-		ipPortInfo := response[start+1 : end]
-		parts := strings.Split(ipPortInfo, ",")
-		if len(parts) == 6 {
-			ip := strings.Join(parts[:4], ".")
-			port := (parseInt(parts[4]) << 8) + parseInt(parts[5])
-			return ip, port, nil
-		}
-	}
-	return "", 0, fmt.Errorf("Failed to parse PASV response")
-}
-
-// 辅助函数：将字符串转换为整数
-func parseInt(s string) int {
-	i, _ := strconv.Atoi(s)
-	return i
-}
-
-// 建立数据连接并获取报文内容
-func fetchData(ip string, port int) ([]byte, error) {
-	addr := fmt.Sprintf("%s:%d", ip, port)
-	conn, err := net.Dial("tcp", addr)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-
-	// 读取数据
-	data := make([]byte, 4096)
-	n, err := conn.Read(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
 func (stream *dubboStream) prepareForNewMessage() {
 	stream.data = stream.data[stream.parseOffset:]
 	stream.parseOffset = 0
@@ -189,6 +148,8 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	// 在这里处理 Dubbo 协议的解析逻辑
 	fmt.Println("解析 Dubbo 数据包:", pkt.Payload)
 	logp.Info(pkt.Payload)
+
+	priv := dubboPrivateData{}
 
 	/*priv := dubboPrivateData{}
 	if private != nil {
@@ -241,16 +202,4 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 		}
 	}*/
 	return priv
-}
-
-// Called when the parser has identified a full message.
-func (dubbo *dubboPlugin) messageComplete(tcptuple *common.TCPTuple, dir uint8, stream *dubboStream) {
-
-	logp.Info("dubbo", "message completed...")
-
-	// all ok, ship it
-	msg := stream.data[stream.message.start:stream.message.end]
-
-	// and reset message
-	stream.prepareForNewMessage()
 }

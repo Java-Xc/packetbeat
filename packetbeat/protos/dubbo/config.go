@@ -26,7 +26,7 @@ type dubboConfig struct {
 	config.ProtocolCommon `config:",inline"`
 }
 
-var defaultConfig = ftpConfig{
+var defaultConfig = dubboConfig{
 	ProtocolCommon: config.ProtocolCommon{
 		TransactionTimeout: protos.DefaultTransactionExpiration,
 	},
