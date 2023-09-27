@@ -89,7 +89,7 @@ func (dubbo *dubboPlugin) setFromConfig(config *dubboConfig) {
 	dubbo.ports = config.Ports
 	dubbo.sendRequest = config.SendRequest
 	dubbo.sendResponse = config.SendResponse
-	dubbo.transactionTimeout = dubbo.TransactionTimeout
+	dubbo.transactionTimeout = config.TransactionTimeout
 }
 
 func (dubbo *dubboPlugin) GetPorts() []int {
