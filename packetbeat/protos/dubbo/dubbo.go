@@ -24,9 +24,9 @@ import (
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/packetbeat/procs"
 	"github.com/elastic/beats/v7/packetbeat/protos"
-	"github.com/elastic/beats/v7/packetbeat/protos/tcp"
 	conf "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"log"
 	"time"
 )
 
@@ -133,22 +133,12 @@ func dubboMessageParser(s *dubboStream) (bool, bool) {
 	// 读取Dubbo消息类型（请求或响应）
 	messageType := s.readByte()
 	isRequest := messageType == 0
-	if isRequest {
-
-	}
 
 	// 读取请求/响应ID
 	requestID := s.readUint64()
 
-	serviceName := s.readString()
-	methodName := s.readString()
-	// 解析请求参数
-	parameters := s.readBytes(len(s.data))
-	// 打印解析结果
-	fmt.Printf("Request ID: %d\nService Name: %s\nMethod Name: %s\nParameters: %s\n", requestID, serviceName, methodName, parameters)
-
 	// 如果是请求，解析服务名和方法名
-	/*if isRequest {
+	if isRequest {
 		serviceName := s.readString()
 		methodName := s.readString()
 		// 解析请求参数
@@ -164,7 +154,7 @@ func dubboMessageParser(s *dubboStream) (bool, bool) {
 		result := s.readBytes(len(s.data))
 		fmt.Printf("Request ID: %d\nStatus: %d\nResult: %s\n", requestID, status, result)
 		return false, true // 表示成功解析请求
-	}*/
+	}
 
 	return false, false
 }
@@ -237,54 +227,182 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	// 在这里处理 Dubbo 协议的解析逻辑
 	fmt.Println("解析 Dubbo 数据包:", pkt.Payload)
 
-	priv := dubboPrivateData{}
-	if private != nil {
-		var ok bool
-		priv, ok = private.(dubboPrivateData)
-		if !ok {
-			priv = dubboPrivateData{}
-		}
+	if pkt == nil || pkt.Payload == nil {
+		return private
 	}
+	log.Println("Received Dubbo packet.")
 
-	if priv.data[dir] == nil {
-		//客户端到服务器端的请求
-		priv.data[dir] = &dubboStream{
-			data:    pkt.Payload,
-			message: &dubboMessage{ts: pkt.Ts},
-		}
-	} else {
-		// concatenate bytes
-		priv.data[dir].data = append(priv.data[dir].data, pkt.Payload...)
-		if len(priv.data[dir].data) > tcp.TCPMaxDataInStream {
-			logp.Debug("dubbo", "Stream data too large, dropping TCP stream")
-			priv.data[dir] = nil
-			return priv
-		}
-	}
+	// 解析 Dubbo 协议消息
+	messageType, remainingData := parseMessageType(pkt.Payload)
+	requestID, remainingData := parseRequestID(remainingData)
+	serviceName, remainingData := parseServiceName(remainingData)
+	methodName, remainingData := parseMethodName(remainingData)
+	parameters, remainingData := parseParameters(remainingData)
 
-	stream := priv.data[dir]
-	for len(stream.data) > 0 {
-		if stream.message == nil {
-			stream.message = &dubboMessage{ts: pkt.Ts}
-		}
+	// 在这里你可以处理解析出来的 Dubbo 协议信息
+	log.Printf("Message Type: %d\n", messageType)
+	log.Printf("Request ID: %d\n", requestID)
+	log.Printf("Service Name: %s\n", serviceName)
+	log.Printf("Method Name: %s\n", methodName)
+	log.Printf("Parameters: %v\n", parameters)
 
-		ok, complete := dubboMessageParser(priv.data[dir])
-		if !ok {
-			// drop this tcp stream. Will retry parsing with the next
-			// segment in it
-			priv.data[dir] = nil
-			logp.Debug("dubbo", "Ignore DUBBO message. Drop tcp stream. Try parsing with the next segment")
-			return priv
+	// 返回 private，可用于在不同数据包之间传递信息
+	return private
+	/*
+		priv := dubboPrivateData{}
+		if private != nil {
+			var ok bool
+			priv, ok = private.(dubboPrivateData)
+			if !ok {
+				priv = dubboPrivateData{}
+			}
 		}
 
-		if complete {
-			dubbo.messageComplete(tcptuple, dir, stream)
+		if priv.data[dir] == nil {
+			//客户端到服务器端的请求
+			priv.data[dir] = &dubboStream{
+				data:    pkt.Payload,
+				message: &dubboMessage{ts: pkt.Ts},
+			}
 		} else {
-			// wait for more data
-			break
+			// concatenate bytes
+			priv.data[dir].data = append(priv.data[dir].data, pkt.Payload...)
+			if len(priv.data[dir].data) > tcp.TCPMaxDataInStream {
+				logp.Debug("dubbo", "Stream data too large, dropping TCP stream")
+				priv.data[dir] = nil
+				return priv
+			}
+		}
+
+		stream := priv.data[dir]
+		for len(stream.data) > 0 {
+			if stream.message == nil {
+				stream.message = &dubboMessage{ts: pkt.Ts}
+			}
+
+			ok, complete := dubboMessageParser(priv.data[dir])
+			if !ok {
+				// drop this tcp stream. Will retry parsing with the next
+				// segment in it
+				priv.data[dir] = nil
+				logp.Debug("dubbo", "Ignore DUBBO message. Drop tcp stream. Try parsing with the next segment")
+				return priv
+			}
+
+			if complete {
+				dubbo.messageComplete(tcptuple, dir, stream)
+			} else {
+				// wait for more data
+				break
+			}
+		}
+		return priv*/
+}
+
+// 解析 Dubbo 消息类型
+func parseMessageType(payload []byte) (int, []byte) {
+	if len(payload) < 2 {
+		// 数据包长度不足以解析消息类型
+		return 0, payload
+	}
+
+	// Dubbo 协议中，消息类型通常是一个16位的整数
+	messageType := int(payload[0])<<8 | int(payload[1])
+	remainingData := payload[2:]
+
+	return messageType, remainingData
+}
+
+// 解析 Dubbo 请求ID
+func parseRequestID(payload []byte) (int64, []byte) {
+	if len(payload) < 8 {
+		// 数据包长度不足以解析请求ID
+		return 0, payload
+	}
+
+	// Dubbo 协议中，请求ID通常是一个64位的整数，使用大端字节序存储
+	requestID := int64(binary.BigEndian.Uint64(payload[:8]))
+	remainingData := payload[8:]
+
+	return requestID, remainingData
+}
+
+// 解析 Dubbo 服务名
+func parseServiceName(payload []byte) (string, []byte) {
+	// 假设 Dubbo 协议的服务名以 0x2f 字节作为分隔符
+	separator := byte(0x2f)
+
+	// 查找第一个分隔符的位置
+	separatorIndex := bytes.IndexByte(payload, separator)
+	if separatorIndex == -1 {
+		// 没有找到分隔符，无法解析服务名
+		return "", payload
+	}
+
+	// 提取服务名部分
+	serviceName := string(payload[:separatorIndex])
+	remainingData := payload[separatorIndex+1:]
+
+	return serviceName, remainingData
+}
+
+// 解析 Dubbo 方法名
+func parseMethodName(payload []byte) (string, []byte) {
+	// 假设 Dubbo 协议的方法名以 0x2e 字节作为分隔符
+	separator := byte(0x2e)
+
+	// 查找第一个分隔符的位置
+	separatorIndex := bytes.IndexByte(payload, separator)
+	if separatorIndex == -1 {
+		// 没有找到分隔符，无法解析方法名
+		return "", payload
+	}
+
+	// 提取方法名部分
+	methodName := string(payload[:separatorIndex])
+	remainingData := payload[separatorIndex+1:]
+
+	return methodName, remainingData
+}
+
+// 解析 Dubbo 参数
+func parseParameters(payload []byte) (map[string]interface{}, []byte) {
+	parameters := make(map[string]interface{})
+
+	// 解析参数的逻辑需要根据 Dubbo 协议规范和实际情况来实现
+	// 这里演示解析字符串、整数和布尔值参数的示例
+
+	for len(payload) > 0 {
+		// 参数类型标志位
+		paramType := payload[0]
+		payload = payload[1:]
+
+		switch paramType {
+		case 'S':
+			// 字符串参数
+			strLen := binary.BigEndian.Uint16(payload[:2])
+			payload = payload[2:]
+			paramValue := string(payload[:strLen])
+			payload = payload[strLen:]
+			parameters["stringParam"] = paramValue
+		case 'I':
+			// 整数参数
+			paramValue := int(binary.BigEndian.Uint32(payload[:4]))
+			payload = payload[4:]
+			parameters["intParam"] = paramValue
+		case 'B':
+			// 布尔值参数
+			paramValue := payload[0] != 0
+			payload = payload[1:]
+			parameters["boolParam"] = paramValue
+		default:
+			// 未知参数类型，可以根据需求处理
+			// 这里可以记录日志或进行其他处理
+			// 或者根据 Dubbo 协议规范处理其他参数类型
 		}
 	}
-	return priv
+
+	return parameters, payload
 }
 
 // Called when the parser has identified a full message.
