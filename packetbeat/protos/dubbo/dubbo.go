@@ -307,10 +307,10 @@ func parseMessageType(payload []byte) (int, []byte) {
 	}
 
 	// Dubbo 协议中，消息类型通常是一个16位的整数
-	messageType := int(payload[0])<<8 | int(payload[1])
+	messageType := binary.BigEndian.Uint16(payload)
 	remainingData := payload[2:]
 
-	return messageType, remainingData
+	return int(messageType), remainingData
 }
 
 // 解析 Dubbo 请求ID
