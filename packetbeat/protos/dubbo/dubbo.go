@@ -131,14 +131,21 @@ func dubboMessageParser(s *dubboStream) (bool, bool) {
 	}
 
 	// 读取Dubbo消息类型（请求或响应）
-	messageType := s.readByte()
-	isRequest := messageType == 0
+	// messageType := s.readByte()
+	// isRequest := messageType == 0
 
 	// 读取请求/响应ID
 	requestID := s.readUint64()
 
+	serviceName := s.readString()
+	methodName := s.readString()
+	// 解析请求参数
+	parameters := s.readBytes(len(s.data))
+	// 打印解析结果
+	fmt.Printf("Request ID: %d\nService Name: %s\nMethod Name: %s\nParameters: %s\n", requestID, serviceName, methodName, parameters)
+
 	// 如果是请求，解析服务名和方法名
-	if isRequest {
+	/*if isRequest {
 		serviceName := s.readString()
 		methodName := s.readString()
 		// 解析请求参数
@@ -154,7 +161,7 @@ func dubboMessageParser(s *dubboStream) (bool, bool) {
 		result := s.readBytes(len(s.data))
 		fmt.Printf("Request ID: %d\nStatus: %d\nResult: %s\n", requestID, status, result)
 		return false, true // 表示成功解析请求
-	}
+	}*/
 
 	return false, false
 }
