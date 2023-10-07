@@ -240,10 +240,10 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	/*parameters, remainingData := parseParameters(remainingData)*/
 
 	// 在这里你可以处理解析出来的 Dubbo 协议信息
-	log.Printf("Message Type: %d\n", messageType)
-	log.Printf("Request ID: %d\n", requestID)
-	log.Printf("Service Name: %s\n", serviceName)
-	log.Printf("Method Name: %s\n", methodName)
+	fmt.Printf("Message Type: %d\n", messageType)
+	fmt.Printf("Request ID: %d\n", requestID)
+	fmt.Printf("Service Name: %s\n", serviceName)
+	fmt.Printf("Method Name: %s\n", methodName)
 	/*	log.Printf("Parameters: %v\n", parameters)
 	 */
 	// 返回 private，可用于在不同数据包之间传递信息
