@@ -133,6 +133,9 @@ func dubboMessageParser(s *dubboStream) (bool, bool) {
 	// 读取Dubbo消息类型（请求或响应）
 	messageType := s.readByte()
 	isRequest := messageType == 0
+	if isRequest {
+
+	}
 
 	// 读取请求/响应ID
 	requestID := s.readUint64()
