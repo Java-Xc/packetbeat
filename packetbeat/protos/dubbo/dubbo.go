@@ -166,12 +166,6 @@ func (s *dubboStream) readByte() byte {
 	return b
 }
 
-func (s *dubboStream) readBytes(length int) []byte {
-	bytes := s.data[:length]
-	s.data = s.data[length:]
-	return bytes
-}
-
 func (s *dubboStream) readUint64() uint64 {
 	data := s.readBytes(8)
 	return binary.BigEndian.Uint64(data)
@@ -219,6 +213,12 @@ func (dubbo *dubboPlugin) ReceivedFin(tcptuple *common.TCPTuple, dir uint8,
 	return private
 }
 
+func (s *dubboStream) readBytes(length int) []byte {
+	bytes := s.data[:length]
+	s.data = s.data[length:]
+	return bytes
+}
+
 // 解析Packet
 func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	dir uint8, private protos.ProtocolData,
@@ -231,13 +231,14 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 		return private
 	}
 
-	payload := string(pkt.Payload)
-	lines := strings.Split(payload, "\n")
-
-	for i, line := range lines {
-		fmt.Printf("Line %d: %s\n", i+1, line)
+	ok, remainingData := isDubbo(pkt.Payload)
+	if ok {
+		payload := string(remainingData)
+		lines := strings.Split(payload, "\n")
+		for i, line := range lines {
+			fmt.Printf("Line %d: %s\n", i+1, line)
+		}
 	}
-
 	// 解析 Dubbo 协议消息
 	/*messageType, remainingData := parseMessageType(pkt.Payload)
 	requestID, remainingData := parseRequestID(remainingData)
@@ -303,6 +304,24 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 			}
 		}
 		return priv*/
+}
+
+// 判断是否为dubbo协议（以魔数判断）
+func isDubbo(payload []byte) (bool, []byte) {
+	// 判断负载长度是否大于等于4个字节（Dubbo 魔数长度）
+	if len(payload) < 4 {
+		fmt.Println("Payload length is less than 4 bytes, unable to read Dubbo magic number")
+		return false, payload
+	}
+	// 读取前四个字节作为 Dubbo 魔数
+	dubboMagic := binary.BigEndian.Uint32(payload[:4])
+	// 判断 Dubbo 魔数是否匹配
+	if dubboMagic != 0xdabb {
+		fmt.Printf("Dubbo magic number not found. Got: %x\n", dubboMagic)
+		return false, payload
+	}
+	remainingData := payload[4:]
+	return true, remainingData
 }
 
 // 解析 Dubbo 消息类型
