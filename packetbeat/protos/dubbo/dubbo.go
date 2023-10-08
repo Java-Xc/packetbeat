@@ -234,10 +234,10 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	dubboHeader := pkt.Payload[:16] // Extracting first 16 bytes as Dubbo header
 
 	// Extracting the first byte of Dubbo header
-	firstByte := dubboHeader[3]
+	thirdByte := dubboHeader[2]
 
 	// Extracting the Req/Res flag (1st bit of the first byte)
-	reqResFlag := (firstByte & 0x80) >> 7
+	reqResFlag := (thirdByte & 0x80) >> 7
 	fmt.Println("请求标识为:", reqResFlag)
 
 	//判断是否为dubbo协议（通过魔数）
