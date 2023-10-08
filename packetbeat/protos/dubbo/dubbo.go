@@ -26,7 +26,7 @@ import (
 	"github.com/elastic/beats/v7/packetbeat/protos"
 	conf "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
-	"log"
+	"strings"
 	"time"
 )
 
@@ -230,20 +230,26 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	if pkt == nil || pkt.Payload == nil {
 		return private
 	}
-	log.Println("Received Dubbo packet.")
+
+	payload := string(pkt.Payload)
+	lines := strings.Split(payload, "\n")
+
+	for i, line := range lines {
+		fmt.Printf("Line %d: %s\n", i+1, line)
+	}
 
 	// 解析 Dubbo 协议消息
-	messageType, remainingData := parseMessageType(pkt.Payload)
+	/*messageType, remainingData := parseMessageType(pkt.Payload)
 	requestID, remainingData := parseRequestID(remainingData)
 	serviceName, remainingData := parseServiceName(remainingData)
-	methodName, remainingData := parseMethodName(remainingData)
+	methodName, remainingData := parseMethodName(remainingData)*/
 	/*parameters, remainingData := parseParameters(remainingData)*/
 
 	// 在这里你可以处理解析出来的 Dubbo 协议信息
-	fmt.Printf("Message Type: %d\n", messageType)
+	/*fmt.Printf("Message Type: %d\n", messageType)
 	fmt.Printf("Request ID: %d\n", requestID)
 	fmt.Printf("Service Name: %s\n", serviceName)
-	fmt.Printf("Method Name: %s\n", methodName)
+	fmt.Printf("Method Name: %s\n", methodName)*/
 	/*	log.Printf("Parameters: %v\n", parameters)
 	 */
 	// 返回 private，可用于在不同数据包之间传递信息
