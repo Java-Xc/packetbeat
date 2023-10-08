@@ -232,10 +232,17 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 
 	// Assuming Dubbo header starts at offset 0 in the packet data
 	dubboHeader := pkt.Payload[:16] // Extracting first 16 bytes as Dubbo header
-
-	isDubbo(dubboHeader)
-	isRequest(dubboHeader)
-
+	if isDubbo(dubboHeader) {
+		if isRequest(dubboHeader) {
+			fmt.Println("这是一个dubbo请求:")
+		} else {
+			fmt.Println("这是一个dubbo响应:")
+		}
+		ok, length := bodyLength(dubboHeader)
+		if ok {
+			fmt.Println("dubbo内容总长度:", length)
+		}
+	}
 	// 解析 Dubbo 协议消息
 	/*messageType, remainingData := parseMessageType(pkt.Payload)
 	requestID, remainingData := parseRequestID(remainingData)
@@ -327,7 +334,6 @@ func isDubbo(dubboHeader []byte) bool {
 	}
 	// 读取前2个字节作为 Dubbo 魔数
 	dubboMagic := dubboHeader[:2]
-	fmt.Println("dubboMagic:", dubboMagic)
 	// 判断 Dubbo 魔数是否匹配
 	if !bytes.Equal(dubboMagic, []byte{0xda, 0xbb}) {
 		fmt.Printf("Dubbo magic number not found. Got: %x\n", dubboMagic)
@@ -338,10 +344,24 @@ func isDubbo(dubboHeader []byte) bool {
 
 // 判断是否为请求/响应
 func isRequest(dubboHeader []byte) bool {
+	if len(dubboHeader) < 2 {
+		fmt.Println("dubboHeader length is less than 3 bytes, unable to read Dubbo req/res flag")
+		return false
+	}
 	// Extracting the 3 byte of Dubbo header
 	thirdByte := dubboHeader[2]
-	fmt.Println("thirdByte:", thirdByte)
 	reqResFlag := (thirdByte & 0x80) >> 7
 	//请求：1，响应：0。
 	return reqResFlag == 0
+}
+
+// 获取body的长度
+func bodyLength(dubboHeader []byte) (bool, int) {
+	//消息总长度位于header中的后面4个字节
+	if len(dubboHeader) < 16 {
+		fmt.Println("dubboHeader length is less than 16 bytes, unable to read body length")
+		return false, 0
+	}
+	messageLength := int(binary.BigEndian.Uint32(dubboHeader[12:16]))
+	return true, messageLength
 }
