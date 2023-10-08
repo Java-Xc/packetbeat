@@ -249,9 +249,9 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 			ok, body := bodyByte(pkt.Payload, length)
 			if ok {
 
-				decoder := hessian.NewDecoder(bytes.NewReader(body))
+				decoder := hessian.NewDecoder(body)
 				var dubboMessage map[string]interface{}
-				err := decoder.Decode(&dubboMessage)
+				err, _ := decoder.Decode()
 				if err != nil {
 					// Handle error
 				}
