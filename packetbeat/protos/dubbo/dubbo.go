@@ -247,6 +247,7 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 		if ok {
 			//获取body的字节数组
 			ok, body := bodyByte(pkt.Payload, length)
+			fmt.Println("body:", body)
 			if ok {
 				decodedObject, err := hessian.NewDecoder(body).Decode()
 				fmt.Println("decodedObject:", decodedObject)
