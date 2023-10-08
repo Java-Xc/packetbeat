@@ -233,6 +233,7 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 
 	ok, remainingData := isDubbo(pkt.Payload)
 	if ok {
+		fmt.Println("解析 Dubbo 数据包1:", remainingData)
 		payload := string(remainingData)
 		lines := strings.Split(payload, "\n")
 		for i, line := range lines {
