@@ -248,8 +248,12 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 			//获取body的字节数组
 			ok, body := bodyByte(pkt.Payload, length)
 			if ok {
-				decoder := hessian.NewDecoder(body)
-				fmt.Println("decoder:", decoder)
+				decodedObject, err := hessian.NewDecoder(body).Decode()
+				if err == nil {
+					if dataMap, ok := decodedObject.(map[interface{}]interface{}); ok {
+						fmt.Println("dataMap:", dataMap)
+					}
+				}
 			}
 		}
 	}
