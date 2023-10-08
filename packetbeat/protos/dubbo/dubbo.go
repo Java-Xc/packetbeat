@@ -309,18 +309,18 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 // 判断是否为dubbo协议（以魔数判断）
 func isDubbo(payload []byte) (bool, []byte) {
 	// 判断负载长度是否大于等于4个字节（Dubbo 魔数长度）
-	if len(payload) < 4 {
-		fmt.Println("Payload length is less than 4 bytes, unable to read Dubbo magic number")
+	if len(payload) < 2 {
+		fmt.Println("Payload length is less than 2 bytes, unable to read Dubbo magic number")
 		return false, payload
 	}
 	// 读取前四个字节作为 Dubbo 魔数
-	dubboMagic := binary.BigEndian.Uint32(payload[:4])
+	dubboMagic := payload[:2]
 	// 判断 Dubbo 魔数是否匹配
-	if dubboMagic != 0xdabb {
+	if !bytes.Equal(dubboMagic, []byte{0xda, 0xbb}) {
 		fmt.Printf("Dubbo magic number not found. Got: %x\n", dubboMagic)
 		return false, payload
 	}
-	remainingData := payload[4:]
+	remainingData := payload[2:]
 	return true, remainingData
 }
 
