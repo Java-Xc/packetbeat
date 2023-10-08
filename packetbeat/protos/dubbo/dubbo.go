@@ -248,20 +248,8 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 			//获取body的字节数组
 			ok, body := bodyByte(pkt.Payload, length)
 			if ok {
-
 				decoder := hessian.NewDecoder(body)
-				var dubboMessage map[string]interface{}
-				err, _ := decoder.Decode()
-				if err != nil {
-					// Handle error
-				}
-				// Extract service, method, interface, and parameters from the Dubbo message map
-				service := dubboMessage["service"].(string)
-				method := dubboMessage["method"].(string)
-				iface := dubboMessage["interface"].(string)
-				fmt.Println("dubbo-service:", service)
-				fmt.Println("dubb-method:", method)
-				fmt.Println("dubbo-iface:", iface)
+				fmt.Println("decoder:", decoder)
 			}
 		}
 	}
