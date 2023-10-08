@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/apache/dubbo-go-hessian2"
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/packetbeat/procs"
 	"github.com/elastic/beats/v7/packetbeat/protos"
@@ -230,84 +231,41 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 		return private
 	}
 
-	// Assuming Dubbo header starts at offset 0 in the packet data
+	//获取header。16个字节长度
 	dubboHeader := pkt.Payload[:16] // Extracting first 16 bytes as Dubbo header
+	//判断是否为dubbo协议
 	if isDubbo(dubboHeader) {
+		//判断是请求还是响应
 		if isRequest(dubboHeader) {
 			fmt.Println("这是一个dubbo请求:")
 		} else {
 			fmt.Println("这是一个dubbo响应:")
 		}
+		//获取body的长度
 		ok, length := bodyLength(dubboHeader)
+		fmt.Println("dubbo内容总长度:", length)
 		if ok {
-			fmt.Println("dubbo内容总长度:", length)
+			//获取body的字节数组
+			ok, body := bodyByte(pkt.Payload, length)
+			if ok {
+
+				decoder := hessian.NewDecoder(bytes.NewReader(body))
+				var dubboMessage map[string]interface{}
+				err := decoder.Decode(&dubboMessage)
+				if err != nil {
+					// Handle error
+				}
+				// Extract service, method, interface, and parameters from the Dubbo message map
+				service := dubboMessage["service"].(string)
+				method := dubboMessage["method"].(string)
+				iface := dubboMessage["interface"].(string)
+				fmt.Println("dubbo-service:", service)
+				fmt.Println("dubb-method:", method)
+				fmt.Println("dubbo-iface:", iface)
+			}
 		}
 	}
-	// 解析 Dubbo 协议消息
-	/*messageType, remainingData := parseMessageType(pkt.Payload)
-	requestID, remainingData := parseRequestID(remainingData)
-	serviceName, remainingData := parseServiceName(remainingData)
-	methodName, remainingData := parseMethodName(remainingData)*/
-	/*parameters, remainingData := parseParameters(remainingData)*/
-
-	// 在这里你可以处理解析出来的 Dubbo 协议信息
-	/*fmt.Printf("Message Type: %d\n", messageType)
-	fmt.Printf("Request ID: %d\n", requestID)
-	fmt.Printf("Service Name: %s\n", serviceName)
-	fmt.Printf("Method Name: %s\n", methodName)*/
-	/*	log.Printf("Parameters: %v\n", parameters)
-	 */
-	// 返回 private，可用于在不同数据包之间传递信息
 	return private
-	/*
-		priv := dubboPrivateData{}
-		if private != nil {
-			var ok bool
-			priv, ok = private.(dubboPrivateData)
-			if !ok {
-				priv = dubboPrivateData{}
-			}
-		}
-
-		if priv.data[dir] == nil {
-			//客户端到服务器端的请求
-			priv.data[dir] = &dubboStream{
-				data:    pkt.Payload,
-				message: &dubboMessage{ts: pkt.Ts},
-			}
-		} else {
-			// concatenate bytes
-			priv.data[dir].data = append(priv.data[dir].data, pkt.Payload...)
-			if len(priv.data[dir].data) > tcp.TCPMaxDataInStream {
-				logp.Debug("dubbo", "Stream data too large, dropping TCP stream")
-				priv.data[dir] = nil
-				return priv
-			}
-		}
-
-		stream := priv.data[dir]
-		for len(stream.data) > 0 {
-			if stream.message == nil {
-				stream.message = &dubboMessage{ts: pkt.Ts}
-			}
-
-			ok, complete := dubboMessageParser(priv.data[dir])
-			if !ok {
-				// drop this tcp stream. Will retry parsing with the next
-				// segment in it
-				priv.data[dir] = nil
-				logp.Debug("dubbo", "Ignore DUBBO message. Drop tcp stream. Try parsing with the next segment")
-				return priv
-			}
-
-			if complete {
-				dubbo.messageComplete(tcptuple, dir, stream)
-			} else {
-				// wait for more data
-				break
-			}
-		}
-		return priv*/
 }
 
 // Called when the parser has identified a full message.
@@ -327,7 +285,6 @@ func (dubbo *dubboPlugin) isServerPort(port uint16) bool {
 
 // 判断是否为dubbo协议（以魔数判断）
 func isDubbo(dubboHeader []byte) bool {
-	// 判断负载长度是否大于等于4个字节（Dubbo 魔数长度）
 	if len(dubboHeader) < 2 {
 		fmt.Println("dubboHeader length is less than 2 bytes, unable to read Dubbo magic number")
 		return false
@@ -351,17 +308,25 @@ func isRequest(dubboHeader []byte) bool {
 	// Extracting the 3 byte of Dubbo header
 	thirdByte := dubboHeader[2]
 	reqResFlag := (thirdByte & 0x80) >> 7
-	//请求：1，响应：0。
-	return reqResFlag == 0
+	//请求=1,响应=0
+	return reqResFlag == 1
 }
 
 // 获取body的长度
 func bodyLength(dubboHeader []byte) (bool, int) {
-	//消息总长度位于header中的后面4个字节
 	if len(dubboHeader) < 16 {
 		fmt.Println("dubboHeader length is less than 16 bytes, unable to read body length")
 		return false, 0
 	}
 	messageLength := int(binary.BigEndian.Uint32(dubboHeader[12:16]))
 	return true, messageLength
+}
+
+func bodyByte(payload []byte, length int) (bool, []byte) {
+	if len(payload) < 16+length {
+		fmt.Println("unable to read body")
+		return false, nil
+	}
+	data := payload[16 : 16+length]
+	return true, data
 }
