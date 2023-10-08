@@ -26,7 +26,6 @@ import (
 	"github.com/elastic/beats/v7/packetbeat/protos"
 	conf "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
-	"strings"
 	"time"
 )
 
@@ -231,7 +230,18 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 		return private
 	}
 
-	ok, remainingData := isDubbo(pkt.Payload)
+	// Assuming Dubbo header starts at offset 0 in the packet data
+	dubboHeader := pkt.Payload[:16] // Extracting first 16 bytes as Dubbo header
+
+	// Extracting the first byte of Dubbo header
+	firstByte := dubboHeader[3]
+
+	// Extracting the Req/Res flag (1st bit of the first byte)
+	reqResFlag := (firstByte & 0x80) >> 7
+	fmt.Println("请求标识为:", reqResFlag)
+
+	//判断是否为dubbo协议（通过魔数）
+	/*ok, remainingData := isDubbo(pkt.Payload)
 	if ok {
 		fmt.Println("解析 Dubbo 数据包1:", remainingData)
 		payload := string(remainingData)
@@ -239,7 +249,8 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 		for i, line := range lines {
 			fmt.Printf("Line %d: %s\n", i+1, line)
 		}
-	}
+	}*/
+
 	// 解析 Dubbo 协议消息
 	/*messageType, remainingData := parseMessageType(pkt.Payload)
 	requestID, remainingData := parseRequestID(remainingData)
