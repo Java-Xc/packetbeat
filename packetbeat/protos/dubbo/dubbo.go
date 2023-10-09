@@ -251,11 +251,12 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 			fmt.Println("body1:", string(body))
 			if ok {
 				decodedObject, err := hessian.NewDecoder(body).Decode()
-				fmt.Println("body1:", string(body))
 
 				fmt.Println("解码后:", decodedObject)
-				as := hessian.NewEncoder().Encode(decodedObject)
-				fmt.Println("编码后:", as)
+				encoder := hessian.NewEncoder()
+				encoder.Encode(decodedObject)
+				encodedBytes := encoder.Buffer()
+				fmt.Println("编码后:", encodedBytes)
 
 				fmt.Println("decodedObject:", decodedObject)
 				if err == nil {
