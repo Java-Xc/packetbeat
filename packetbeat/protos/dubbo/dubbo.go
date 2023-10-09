@@ -317,9 +317,8 @@ func bodyLength(dubboHeader []byte) (bool, int) {
 		return false, 0
 	}
 
-	fmt.Println("length is: ", dubboHeader[0])
-	fmt.Println("length is: ", dubboHeader[1])
-	fmt.Println("length is: ", dubboHeader[12:16])
+	fmt.Println("length is: ", dubboHeader[0:1])
+	fmt.Println("length is: ", dubboHeader[0:2])
 
 	messageLength := int(binary.BigEndian.Uint32(dubboHeader[12:16]))
 	return true, messageLength
