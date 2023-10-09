@@ -248,6 +248,7 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 			//获取body的字节数组
 			ok, body := bodyByte(pkt.Payload, length)
 			fmt.Println("body:", body)
+			fmt.Println("body1:", string(body))
 			if ok {
 				decodedObject, err := hessian.NewDecoder(body).Decode()
 				fmt.Println("decodedObject:", decodedObject)
@@ -316,10 +317,6 @@ func bodyLength(dubboHeader []byte) (bool, int) {
 		fmt.Println("dubboHeader length is less than 16 bytes, unable to read body length")
 		return false, 0
 	}
-
-	fmt.Println("length is: ", dubboHeader[0:1])
-	fmt.Println("length is: ", dubboHeader[0:2])
-
 	messageLength := int(binary.BigEndian.Uint32(dubboHeader[12:16]))
 	return true, messageLength
 }
