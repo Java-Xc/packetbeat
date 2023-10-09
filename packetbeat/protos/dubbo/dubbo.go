@@ -247,50 +247,56 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 		if ok {
 			//获取body的字节数组
 			ok, body := bodyByte(pkt.Payload, length)
-			fmt.Println("body:", body)
-			fmt.Println("body1:", string(body))
+
 			if ok {
-				decodedObject, err := hessian.NewDecoder(pkt.Payload).Decode()
 
-				fmt.Println("解码后:", decodedObject)
-				encoder := hessian.NewEncoder()
-				encoder.Encode(decodedObject)
-				encodedBytes := encoder.Buffer()
-				fmt.Println("编码后:", encodedBytes)
+				fmt.Println("body:", body)
+				fmt.Println("body:", string(body))
+				body1 := print(body)
 
-				fmt.Println("decodedObject:", decodedObject)
-				if err == nil {
+				fmt.Println("body1:", body1)
+				fmt.Println("body1:", string(body1))
+				body2 := print(body1)
 
-					switch obj := decodedObject.(type) {
-					case int:
-						// 处理 int 类型
-						fmt.Printf("This is an integer: %d\n", obj)
-					case string:
-						// 处理 string 类型
-						fmt.Printf("This is a string: %s\n", obj)
-					case []interface{}:
-						// 处理切片类型
-						fmt.Println("This is a slice:")
-						for i, v := range obj {
-							fmt.Printf("Element %d: %v\n", i, v)
-						}
-					default:
-						// 未知类型
-						fmt.Printf("Unknown type: %T\n", obj)
-					}
-
-					/*if dataMap, ok := decodedObject.(map[hessian.Object]interface{}); ok {
-						fmt.Println("dataMap:", dataMap)
-					} else {
-						fmt.Println("出错了")
-					}*/
-				} else {
-					fmt.Println("err:", err)
-				}
+				fmt.Println("body2:", body2)
+				fmt.Println("body2:", string(body2))
 			}
 		}
 	}
 	return private
+}
+
+func print(body []byte) []byte {
+	decodedObject, err := hessian.NewDecoder(body).Decode()
+	if err == nil {
+		switch obj := decodedObject.(type) {
+		case int:
+			// 处理 int 类型
+			fmt.Printf("This is an integer: %d\n", obj)
+		case string:
+			// 处理 string 类型
+			fmt.Printf("This is a string: %s\n", obj)
+		case []interface{}:
+			// 处理切片类型
+			fmt.Println("This is a slice:")
+			for i, v := range obj {
+				fmt.Printf("Element %d: %v\n", i, v)
+			}
+		default:
+			// 未知类型
+			fmt.Printf("Unknown type: %T\n", obj)
+		}
+	} else {
+		fmt.Println("err:", err)
+	}
+
+	encoder := hessian.NewEncoder()
+	encoder.Encode(decodedObject)
+	encodedBytes := encoder.Buffer()
+
+	useLen := len(encodedBytes)
+	body1 := body[useLen:]
+	return body1
 }
 
 // Called when the parser has identified a full message.
