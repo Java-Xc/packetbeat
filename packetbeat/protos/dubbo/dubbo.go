@@ -287,7 +287,7 @@ func doRes(body []byte) {
 	for i := 0; i < 2; i++ {
 		bodyUse = useByte(body)
 		if i == 0 {
-			fmt.Println("res type is :", string(bodyUse))
+			fmt.Println("res type is :", bodyUse)
 		} else if i == 1 {
 			fmt.Println("res content is :", string(bodyUse))
 		}
