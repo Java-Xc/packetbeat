@@ -250,7 +250,7 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 			fmt.Println("body:", body)
 			fmt.Println("body1:", string(body))
 			if ok {
-				decodedObject, err := hessian.NewDecoder(body).Decode()
+				decodedObject, err := hessian.NewDecoder(pkt.Payload).Decode()
 
 				fmt.Println("解码后:", decodedObject)
 				encoder := hessian.NewEncoder()
