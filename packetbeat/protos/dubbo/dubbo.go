@@ -316,6 +316,9 @@ func bodyLength(dubboHeader []byte) (bool, int) {
 		fmt.Println("dubboHeader length is less than 16 bytes, unable to read body length")
 		return false, 0
 	}
+
+	fmt.Println("length is: ", dubboHeader[12:16])
+
 	messageLength := int(binary.BigEndian.Uint32(dubboHeader[12:16]))
 	return true, messageLength
 }
