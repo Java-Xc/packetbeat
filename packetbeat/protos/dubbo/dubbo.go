@@ -267,36 +267,40 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 }
 
 func print(body []byte) []byte {
-	decodedObject, err := hessian.NewDecoder(body).Decode()
-	if err == nil {
-		switch obj := decodedObject.(type) {
-		case int:
-			// 处理 int 类型
-			fmt.Printf("This is an integer: %d\n", obj)
-		case string:
-			// 处理 string 类型
-			fmt.Printf("This is a string: %s\n", obj)
-		case []interface{}:
-			// 处理切片类型
-			fmt.Println("This is a slice:")
-			for i, v := range obj {
-				fmt.Printf("Element %d: %v\n", i, v)
+	if len(body) > 0 {
+		decodedObject, err := hessian.NewDecoder(body).Decode()
+		if err == nil {
+			switch obj := decodedObject.(type) {
+			case int:
+				// 处理 int 类型
+				fmt.Printf("This is an integer: %d\n", obj)
+			case string:
+				// 处理 string 类型
+				fmt.Printf("This is a string: %s\n", obj)
+			case []interface{}:
+				// 处理切片类型
+				fmt.Println("This is a slice:")
+				for i, v := range obj {
+					fmt.Printf("Element %d: %v\n", i, v)
+				}
+			default:
+				// 未知类型
+				fmt.Printf("Unknown type: %T\n", obj)
 			}
-		default:
-			// 未知类型
-			fmt.Printf("Unknown type: %T\n", obj)
+		} else {
+			fmt.Println("err:", err)
 		}
-	} else {
-		fmt.Println("err:", err)
+
+		encoder := hessian.NewEncoder()
+		encoder.Encode(decodedObject)
+		encodedBytes := encoder.Buffer()
+
+		useLen := len(encodedBytes)
+		if useLen > 0 {
+			return body[useLen:]
+		}
 	}
-
-	encoder := hessian.NewEncoder()
-	encoder.Encode(decodedObject)
-	encodedBytes := encoder.Buffer()
-
-	useLen := len(encodedBytes)
-	body1 := body[useLen:]
-	return body1
+	return nil
 }
 
 // Called when the parser has identified a full message.
