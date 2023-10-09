@@ -250,21 +250,33 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 			fmt.Println("body:", body)
 			fmt.Println("body1:", string(body))
 			if ok {
-				decodedObject1 := hessian.NewDecoder(body)
-				fmt.Println("decodedObject1:", decodedObject1)
-
 				decodedObject, err := hessian.NewDecoder(body).Decode()
 				fmt.Println("decodedObject:", decodedObject)
-
-				decodedObject2, err := hessian.NewDecoder(body).Decode()
-				fmt.Println("decodedObject2:", decodedObject2)
-
 				if err == nil {
-					if dataMap, ok := decodedObject.(map[hessian.Object]interface{}); ok {
+
+					switch obj := decodedObject.(type) {
+					case int:
+						// 处理 int 类型
+						fmt.Printf("This is an integer: %d\n", obj)
+					case string:
+						// 处理 string 类型
+						fmt.Printf("This is a string: %s\n", obj)
+					case []interface{}:
+						// 处理切片类型
+						fmt.Println("This is a slice:")
+						for i, v := range obj {
+							fmt.Printf("Element %d: %v\n", i, v)
+						}
+					default:
+						// 未知类型
+						fmt.Printf("Unknown type: %T\n", obj)
+					}
+
+					/*if dataMap, ok := decodedObject.(map[hessian.Object]interface{}); ok {
 						fmt.Println("dataMap:", dataMap)
 					} else {
 						fmt.Println("出错了")
-					}
+					}*/
 				} else {
 					fmt.Println("err:", err)
 				}
