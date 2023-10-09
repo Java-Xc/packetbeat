@@ -226,7 +226,6 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	// 解析 Dubbo 数据包的逻辑
 	// 在这里处理 Dubbo 协议的解析逻辑
 	fmt.Println("解析 Dubbo 数据包:", pkt.Payload)
-
 	if pkt == nil || pkt.Payload == nil {
 		return private
 	}
@@ -235,69 +234,62 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	dubboHeader := pkt.Payload[:16] // Extracting first 16 bytes as Dubbo header
 	//判断是否为dubbo协议
 	if isDubbo(dubboHeader) {
-		//判断是请求还是响应
-		if isRequest(dubboHeader) {
-			fmt.Println("这是一个dubbo请求:")
-		} else {
-			fmt.Println("这是一个dubbo响应:")
-		}
+
 		//获取body的长度
 		ok, length := bodyLength(dubboHeader)
-		fmt.Println("dubbo内容总长度:", length)
 		if ok {
-			//获取body的字节数组
-			ok, body := bodyByte(pkt.Payload, length)
 
+			//获取body的字节数组内容
+			ok, body := bodyByte(pkt.Payload, length)
 			if ok {
 
-				fmt.Println("body:", body)
-				fmt.Println("body:", string(body))
-				body1 := print(body)
+				//判断是请求还是响应
+				if isRequest(dubboHeader) {
+					fmt.Println("请求======》")
+					doReq(body)
 
-				fmt.Println("body1:", body1)
-				fmt.Println("body1:", string(body1))
-				body2 := print(body1)
-
-				fmt.Println("body2:", body2)
-				fmt.Println("body2:", string(body2))
+				} else {
+					fmt.Println("《======响应")
+				}
 			}
 		}
 	}
 	return private
 }
 
-func print(body []byte) []byte {
+func doReq(body []byte) {
+	bodyUse := body
+	for i := 0; i < 6; i++ {
+		bodyUse = useByte(body)
+		if i == 0 {
+			fmt.Println("dubbo version is :", string(bodyUse))
+		} else if i == 1 {
+			fmt.Println("dubbo service is :", string(bodyUse))
+		} else if i == 2 {
+			fmt.Println("dubbo service version is :", string(bodyUse))
+		} else if i == 3 {
+			fmt.Println("dubbo method is :", string(bodyUse))
+		} else if i == 4 {
+			fmt.Println("dubbo method param type is :", string(bodyUse))
+		} else if i == 5 {
+			fmt.Println("dubbo method param is :", string(bodyUse))
+		}
+		//移除已经使用的字节
+		if len(bodyUse) > 0 {
+			body = body[len(bodyUse):]
+		}
+	}
+}
+
+func useByte(body []byte) []byte {
 	if len(body) > 0 {
 		decodedObject, err := hessian.NewDecoder(body).Decode()
 		if err == nil {
-			switch obj := decodedObject.(type) {
-			case int:
-				// 处理 int 类型
-				fmt.Printf("This is an integer: %d\n", obj)
-			case string:
-				// 处理 string 类型
-				fmt.Printf("This is a string: %s\n", obj)
-			case []interface{}:
-				// 处理切片类型
-				fmt.Println("This is a slice:")
-				for i, v := range obj {
-					fmt.Printf("Element %d: %v\n", i, v)
-				}
-			default:
-				// 未知类型
-				fmt.Printf("Unknown type: %T\n", obj)
-			}
+			encoder := hessian.NewEncoder()
+			encoder.Encode(decodedObject)
+			return encoder.Buffer()
 		} else {
 			fmt.Println("err:", err)
-		}
-
-		encoder := hessian.NewEncoder()
-		encoder.Encode(decodedObject)
-		encodedBytes := encoder.Buffer()
-
-		useLen := len(encodedBytes)
-		if useLen > 0 {
-			return body[useLen:]
 		}
 	}
 	return nil
