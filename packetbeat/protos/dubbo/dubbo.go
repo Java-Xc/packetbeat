@@ -255,6 +255,10 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 
 				decodedObject, err := hessian.NewDecoder(body).Decode()
 				fmt.Println("decodedObject:", decodedObject)
+
+				decodedObject2, err := hessian.NewDecoder(body).Decode()
+				fmt.Println("decodedObject2:", decodedObject2)
+
 				if err == nil {
 					if dataMap, ok := decodedObject.(map[hessian.Object]interface{}); ok {
 						fmt.Println("dataMap:", dataMap)
