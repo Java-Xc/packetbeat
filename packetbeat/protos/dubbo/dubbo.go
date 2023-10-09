@@ -250,6 +250,7 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 
 				} else {
 					fmt.Println("《======响应")
+					doRes(body)
 				}
 			}
 		}
@@ -262,17 +263,33 @@ func doReq(body []byte) {
 	for i := 0; i < 6; i++ {
 		bodyUse = useByte(body)
 		if i == 0 {
-			fmt.Println("dubbo version is :", string(bodyUse))
+			fmt.Println("req dubbo version is :", string(bodyUse))
 		} else if i == 1 {
-			fmt.Println("dubbo service is :", string(bodyUse))
+			fmt.Println("req dubbo service is :", string(bodyUse))
 		} else if i == 2 {
-			fmt.Println("dubbo service version is :", string(bodyUse))
+			fmt.Println("req dubbo service version is :", string(bodyUse))
 		} else if i == 3 {
-			fmt.Println("dubbo method is :", string(bodyUse))
+			fmt.Println("req dubbo method is :", string(bodyUse))
 		} else if i == 4 {
-			fmt.Println("dubbo method param type is :", string(bodyUse))
+			fmt.Println("req dubbo method param type is :", string(bodyUse))
 		} else if i == 5 {
-			fmt.Println("dubbo method param is :", string(bodyUse))
+			fmt.Println("req dubbo method param is :", string(bodyUse))
+		}
+		//移除已经使用的字节
+		if len(bodyUse) > 0 {
+			body = body[len(bodyUse):]
+		}
+	}
+}
+
+func doRes(body []byte) {
+	bodyUse := body
+	for i := 0; i < 2; i++ {
+		bodyUse = useByte(body)
+		if i == 0 {
+			fmt.Println("res type is :", string(bodyUse))
+		} else if i == 1 {
+			fmt.Println("res content is :", string(bodyUse))
 		}
 		//移除已经使用的字节
 		if len(bodyUse) > 0 {
