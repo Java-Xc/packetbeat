@@ -20,7 +20,6 @@ package dubbo
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"github.com/apache/dubbo-go-hessian2"
 	"github.com/elastic/beats/v7/libbeat/common"
@@ -303,14 +302,7 @@ func useByte(body []byte) []byte {
 	if len(body) > 0 {
 		decodedObject, err := hessian.NewDecoder(body).Decode()
 		if err == nil {
-
-			if byteArray, ok := decodedObject.([]byte); ok {
-				fmt.Printf("二进制数组内容: %v\n", byteArray)
-				fmt.Printf("十六进制字符串: %s\n", hex.EncodeToString(byteArray))
-			} else {
-				fmt.Println("解码结果不是二进制数组")
-			}
-
+			fmt.Printf("解码后: %+v\n", decodedObject)
 			encoder := hessian.NewEncoder()
 			encoder.Encode(decodedObject)
 			return encoder.Buffer()
