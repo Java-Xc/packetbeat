@@ -259,21 +259,20 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 }
 
 func doReq(body []byte) {
-	bodyUse := body
 	for i := 0; i < 6; i++ {
-		bodyUse = useByte(body)
+		data, bodyUse := useByte(body)
 		if i == 0 {
-			fmt.Println("req dubbo version is :", string(bodyUse))
+			fmt.Printf("req version is: %+v\n", data)
 		} else if i == 1 {
-			fmt.Println("req dubbo service is :", string(bodyUse))
+			fmt.Println("req service is : %+v\n", data)
 		} else if i == 2 {
-			fmt.Println("req dubbo service version is :", string(bodyUse))
+			fmt.Println("req service version is : %+v\n", data)
 		} else if i == 3 {
-			fmt.Println("req dubbo method is :", string(bodyUse))
+			fmt.Println("req method is : %+v\n", data)
 		} else if i == 4 {
-			fmt.Println("req dubbo method param type is :", string(bodyUse))
+			fmt.Println("req method param type is : %+v\n", data)
 		} else if i == 5 {
-			fmt.Println("req dubbo method param is :", string(bodyUse))
+			fmt.Println("req method param is : %+v\n", data)
 		}
 		//移除已经使用的字节
 		if len(bodyUse) > 0 {
@@ -283,13 +282,12 @@ func doReq(body []byte) {
 }
 
 func doRes(body []byte) {
-	bodyUse := body
 	for i := 0; i < 2; i++ {
-		bodyUse = useByte(body)
+		data, bodyUse := useByte(body)
 		if i == 0 {
-			fmt.Println("res type is :", string(bodyUse[0]))
+			fmt.Println("res type is : %+v\n", data)
 		} else if i == 1 {
-			fmt.Println("res content is :", string(bodyUse))
+			fmt.Println("res content is : %+v\n", data)
 		}
 		//移除已经使用的字节
 		if len(bodyUse) > 0 {
@@ -298,19 +296,18 @@ func doRes(body []byte) {
 	}
 }
 
-func useByte(body []byte) []byte {
+func useByte(body []byte) (interface{}, []byte) {
 	if len(body) > 0 {
 		decodedObject, err := hessian.NewDecoder(body).Decode()
 		if err == nil {
-			fmt.Printf("解码后: %+v\n", decodedObject)
 			encoder := hessian.NewEncoder()
 			encoder.Encode(decodedObject)
-			return encoder.Buffer()
+			return decodedObject, encoder.Buffer()
 		} else {
 			fmt.Println("err:", err)
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // Called when the parser has identified a full message.
