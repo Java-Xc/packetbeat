@@ -264,15 +264,15 @@ func doReq(body []byte) {
 		if i == 0 {
 			fmt.Printf("req version is: %+v\n", data)
 		} else if i == 1 {
-			fmt.Println("req service is : %+v\n", data)
+			fmt.Printf("req service is: %+v\n", data)
 		} else if i == 2 {
-			fmt.Println("req service version is : %+v\n", data)
+			fmt.Printf("req service version is : %+v\n", data)
 		} else if i == 3 {
-			fmt.Println("req method is : %+v\n", data)
+			fmt.Printf("req method is : %+v\n", data)
 		} else if i == 4 {
-			fmt.Println("req method param type is : %+v\n", data)
+			fmt.Printf("req method param type is : %+v\n", data)
 		} else if i == 5 {
-			fmt.Println("req method param is : %+v\n", data)
+			fmt.Printf("req method param is : %+v\n", data)
 		}
 		//移除已经使用的字节
 		if len(bodyUse) > 0 {
@@ -285,9 +285,9 @@ func doRes(body []byte) {
 	for i := 0; i < 2; i++ {
 		data, bodyUse := useByte(body)
 		if i == 0 {
-			fmt.Println("res type is : %+v\n", data)
+			fmt.Printf("res type is : %+v\n", data)
 		} else if i == 1 {
-			fmt.Println("res content is : %+v\n", data)
+			fmt.Printf("res content is : %+v\n", data)
 		}
 		//移除已经使用的字节
 		if len(bodyUse) > 0 {
