@@ -272,6 +272,17 @@ func doReq(body []byte) {
 		} else if i == 4 {
 			fmt.Printf("req method param type is : %+v\n", data)
 		} else if i == 5 {
+			var resultMap map[string]interface{}
+			if m, ok := data.(map[interface{}]interface{}); ok {
+				resultMap = make(map[string]interface{})
+				for k, v := range m {
+					resultMap[k.(string)] = v
+				}
+			} else if m, ok := data.(map[string]interface{}); ok {
+				resultMap = m
+			}
+
+			fmt.Printf("解码后的数据MAP: %+v\n", resultMap)
 			fmt.Printf("req method param is : %+v\n", data)
 		}
 		//移除已经使用的字节
