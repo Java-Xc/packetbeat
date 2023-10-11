@@ -229,9 +229,17 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	if pkt == nil || pkt.Payload == nil {
 		return private
 	}
+	// 获取源IP地址和目标IP地址
+	srcIP := tcptuple.SrcIP.String()
+	dstIP := tcptuple.DstIP.String()
+	// 获取源端口号和目标端口号
+	srcPort := int(tcptuple.SrcPort)
+	dstPort := int(tcptuple.DstPort)
+	fmt.Println("源IP: %s, 源PORT: %s  <=> 目的IP: %s, 目的PORT: %s", srcIP, srcPort, dstIP, dstPort)
 
 	//获取header。16个字节长度
-	dubboHeader := pkt.Payload[:16] // Extracting first 16 bytes as Dubbo header
+	dubboHeader := pkt.Payload[:16]
+
 	//判断是否为dubbo协议
 	if isDubbo(dubboHeader) {
 
