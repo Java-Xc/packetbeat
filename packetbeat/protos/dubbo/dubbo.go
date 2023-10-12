@@ -235,7 +235,7 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	// 获取源端口号和目标端口号
 	srcPort := int(tcptuple.SrcPort)
 	dstPort := int(tcptuple.DstPort)
-	fmt.Println("源IP: %s, 源PORT: %s  <=> 目的IP: %s, 目的PORT: %s", srcIP, srcPort, dstIP, dstPort)
+	fmt.Printf("源IP: %s, 源PORT: %s  <=> 目的IP: %s, 目的PORT: %s", srcIP, srcPort, dstIP, dstPort)
 
 	//获取header。16个字节长度
 	dubboHeader := pkt.Payload[:16]
@@ -253,11 +253,14 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 
 				//判断是请求还是响应
 				if isRequest(dubboHeader) {
+
 					fmt.Println("请求======》")
+					requestId(dubboHeader)
 					doReq(body)
 
 				} else {
 					fmt.Println("《======响应")
+					requestId(dubboHeader)
 					doRes(body)
 				}
 			}
@@ -306,6 +309,17 @@ func doRes(body []byte) {
 		if i == 0 {
 			fmt.Printf("res type is : %+v\n", data)
 		} else if i == 1 {
+			var resultMap map[string]interface{}
+			if m, ok := data.(map[interface{}]interface{}); ok {
+				resultMap = make(map[string]interface{})
+				for k, v := range m {
+					resultMap[k.(string)] = v
+				}
+			} else if m, ok := data.(map[string]interface{}); ok {
+				resultMap = m
+			}
+
+			fmt.Printf("解码后的数据MAP: %+v\n", resultMap)
 			fmt.Printf("res content is : %+v\n", data)
 		}
 		//移除已经使用的字节
@@ -317,6 +331,7 @@ func doRes(body []byte) {
 
 func useByte(body []byte) (interface{}, []byte) {
 	if len(body) > 0 {
+		//每次只读一个完整的数据字节，并不是读全部
 		decodedObject, err := hessian.NewDecoder(body).Decode()
 		if err == nil {
 			encoder := hessian.NewEncoder()
@@ -367,10 +382,20 @@ func isRequest(dubboHeader []byte) bool {
 		return false
 	}
 	// Extracting the 3 byte of Dubbo header
-	thirdByte := dubboHeader[2]
-	reqResFlag := (thirdByte & 0x80) >> 7
+	flagByte := dubboHeader[2]
+	reqResFlag := (flagByte & 0x80) >> 7
 	//请求=1,响应=0
 	return reqResFlag == 1
+}
+
+func requestId(dubboHeader []byte) (bool, int64) {
+	if len(dubboHeader) < 16 {
+		fmt.Println("dubboHeader length is less than 16 bytes, unable to read body length")
+		return false, 0
+	}
+	requestId := int64(binary.BigEndian.Uint64(dubboHeader[4:12]))
+	fmt.Println("req id is:", requestId)
+	return true, requestId
 }
 
 // 获取body的长度
