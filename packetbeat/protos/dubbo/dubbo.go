@@ -75,8 +75,8 @@ type dubboTransaction struct {
 	bytesIn        uint64
 	notes          []string
 
-	request  string
-	response string
+	request  interface{}
+	response interface{}
 }
 
 type dubboPlugin struct {
@@ -387,7 +387,7 @@ func doReq(body []byte, t *dubboTransaction) {
 
 		} else if i == 5 {
 			if ok, m := convertToObj(data); ok {
-				t.request = m.(string)
+				t.request = m
 			}
 
 		}
