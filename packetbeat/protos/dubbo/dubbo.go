@@ -216,14 +216,6 @@ func (dubbo *dubboPlugin) receivedRequest(msg *dubboMessage) {
 
 	doReq(msg.data, trans)
 	trans.bytesIn = uint64(msg.size)
-
-	if !msg.needResp {
-		trans.bytesOut = 0
-		trans.endTime = msg.ts
-		dubbo.publishTransaction(trans)
-		dubbo.transactions.Delete(msg.reqId)
-		fmt.Printf("dubbo", "Dubbo transaction completed do not need resp, req ID is: %s", msg.reqId)
-	}
 }
 
 func (dubbo *dubboPlugin) receivedResponse(msg *dubboMessage) {
@@ -282,7 +274,6 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 
 	ok, complete := dubbo.messageParser(priv.data[dir])
 	fmt.Printf("dubbodetailed", "messageParser returned %v %v", ok, complete)
-	fmt.Printf("最终的message: %+v\n", priv.data[dir].message)
 
 	if !ok {
 		// drop this tcp stream. Will retry parsing with the next
@@ -321,12 +312,6 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 				if ok {
 					if isRequest(dubboHeader) {
 						s.message.isRequest = true
-						if needResp(dubboHeader) {
-							s.message.needResp = true
-						} else {
-							s.message.needResp = false
-						}
-
 					} else {
 						s.message.isRequest = false
 					}
@@ -476,27 +461,6 @@ func bodyLength(dubboHeader []byte) (bool, int) {
 	}
 	messageLength := int(binary.BigEndian.Uint32(dubboHeader[12:16]))
 	return true, messageLength
-}
-
-// 仅在 Req/Res 为1（请求）时才有用，标记是否期望从服务器返回值。如果需要来自服务器的返回值，则设置为1。
-func needResp(dubboHeader []byte) bool {
-	if len(dubboHeader) < 2 {
-		logp.Err("dubboHeader length is less than 3 bytes, unable to read Dubbo two wat flag")
-		return false
-	}
-	// Extracting the 3 byte of Dubbo header
-	flagByte := dubboHeader[2]
-
-	flagByte1 := dubboHeader[2]
-	flagByte2 := dubboHeader[2]
-
-	fmt.Printf("========================1>>>>%08b\n", flagByte1)
-	fmt.Printf("========================2>>>>%08b\n", (flagByte1 & 0x40))
-	fmt.Printf("========================3>>>>%08b\n", ((flagByte2 & 0x40) >> 6))
-
-	needRespFlag := (flagByte & 0x40) >> 6
-	//标记是否期望从服务器返回值 1=期望
-	return needRespFlag == 1
 }
 
 func bodyByte(payload []byte, length int) (bool, []byte) {
