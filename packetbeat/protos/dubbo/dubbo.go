@@ -324,7 +324,7 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 }
 
 func convertToObj(data interface{}) (bool, interface{}) {
-	var resultMap map[string]interface{}
+	/*var resultMap map[string]interface{}
 	if m, ok := data.(map[interface{}]interface{}); ok {
 		resultMap = make(map[string]interface{})
 		for k, v := range m {
@@ -338,8 +338,9 @@ func convertToObj(data interface{}) (bool, interface{}) {
 
 	} else {
 		return true, fmt.Sprintf("%v", data)
-	}
-	fmt.Printf("convertToObj is err is")
+	}*/
+	return true, fmt.Sprintf("%v", data)
+	fmt.Println("convertToObj is err is")
 	return false, nil
 }
 
