@@ -282,6 +282,7 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 
 	ok, complete := dubbo.messageParser(priv.data[dir])
 	fmt.Printf("dubbodetailed", "messageParser returned %v %v", ok, complete)
+	fmt.Printf("最终的message: %+v\n", priv.data[dir].message)
 
 	if !ok {
 		// drop this tcp stream. Will retry parsing with the next
