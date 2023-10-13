@@ -486,6 +486,14 @@ func needResp(dubboHeader []byte) bool {
 	}
 	// Extracting the 3 byte of Dubbo header
 	flagByte := dubboHeader[2]
+
+	flagByte1 := dubboHeader[2]
+	flagByte2 := dubboHeader[2]
+
+	fmt.Printf("========================1>>>>%08b\n", flagByte1)
+	fmt.Printf("========================2>>>>%08b\n", (flagByte1 & 0x40))
+	fmt.Printf("========================3>>>>%08b\n", ((flagByte2 & 0x40) >> 6))
+
 	needRespFlag := (flagByte & 0x40) >> 6
 	//标记是否期望从服务器返回值 1=期望
 	return needRespFlag == 1
