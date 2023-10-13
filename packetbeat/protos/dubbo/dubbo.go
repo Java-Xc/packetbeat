@@ -403,7 +403,7 @@ func doRes(body []byte, t *dubboTransaction) {
 		data, bodyUse := useByte(body)
 		if i == 1 {
 			if ok, m := convertToObj(data); ok {
-				t.response = m.(string)
+				t.response = m
 			}
 		}
 		//移除已经使用的字节
