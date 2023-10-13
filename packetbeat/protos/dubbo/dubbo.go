@@ -23,10 +23,13 @@ import (
 	"fmt"
 	"github.com/apache/dubbo-go-hessian2"
 	"github.com/elastic/beats/v7/libbeat/common"
+	"github.com/elastic/beats/v7/packetbeat/pb"
 	"github.com/elastic/beats/v7/packetbeat/procs"
 	"github.com/elastic/beats/v7/packetbeat/protos"
+	"github.com/elastic/beats/v7/packetbeat/protos/tcp"
 	conf "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/monitoring"
 	"time"
 )
 
@@ -39,40 +42,64 @@ type dubboStream struct {
 
 	data []byte
 
-	parseOffset int
-
 	message *dubboMessage
 }
 
 type dubboMessage struct {
-	ts        time.Time
-	isRequest bool
-	tcpTuple  common.TCPTuple
-	// 魔数（2 字节）
-	magic uint16
-	// 标志（1 字节）
-	flag string
-	// 状态（1 字节）
-	status string
-	// 请求 ID（8 字节，大端序）
-	requestID uint64
-	// 数据长度（4 字节，大端序）
-	dataLen uint32
-	// 数据（不定长）
-	dubboData string
+	start        int
+	end          int
+	ts           time.Time
+	isRequest    bool
+	cmdlineTuple *common.ProcessTuple
+	tcpTuple     common.TCPTuple
+	reqId        int64
+	needResp     bool
+	direction    uint8
+	data         []byte
+	size         int
+	notes        []string
+}
+
+type dubboTransaction struct {
+	tuple          common.TCPTuple
+	src            common.Endpoint
+	dst            common.Endpoint
+	ts             time.Time
+	endTime        time.Time
+	version        string
+	service        string
+	serviceVersion string
+	method         string
+	paramType      string
+	bytesOut       uint64
+	bytesIn        uint64
+	notes          []string
+
+	request  string
+	response string
 }
 
 type dubboPlugin struct {
 	// config
-	ports        []int
+	ports []int
+
 	sendRequest  bool
 	sendResponse bool
 
+	transactions       *common.Cache
 	transactionTimeout time.Duration
 
 	results protos.Reporter
 	watcher *procs.ProcessesWatcher
+	// function pointer for mocking
+	handleMysql func(dubbo *dubboPlugin, m *dubboMessage, tcp *common.TCPTuple,
+		dir uint8, raw_msg []byte)
 }
+
+var (
+	unmatchedRequests  = monitoring.NewInt(nil, "dubbo.unmatched_requests")
+	unmatchedResponses = monitoring.NewInt(nil, "dubbo.unmatched_responses")
+)
 
 func init() {
 	protos.Register("dubbo", New)
@@ -97,24 +124,45 @@ func New(
 	}
 	return p, nil
 }
-
+func (dubbo *dubboPlugin) init(results protos.Reporter, watcher *procs.ProcessesWatcher, config *dubboConfig) error {
+	dubbo.setFromConfig(config)
+	dubbo.transactions = common.NewCache(dubbo.transactionTimeout, protos.DefaultTransactionHashSize)
+	dubbo.transactions.StartJanitor(dubbo.transactionTimeout)
+	dubbo.watcher = &procs.ProcessesWatcher{}
+	dubbo.results = results
+	dubbo.watcher = watcher
+	return nil
+}
 func (dubbo *dubboPlugin) setFromConfig(config *dubboConfig) {
 	dubbo.ports = config.Ports
 	dubbo.sendRequest = config.SendRequest
 	dubbo.sendResponse = config.SendResponse
 	dubbo.transactionTimeout = config.TransactionTimeout
 }
-
+func (dubbo *dubboPlugin) getTransaction(k int64) *dubboTransaction {
+	v := dubbo.transactions.Get(k)
+	if v != nil {
+		return v.(*dubboTransaction)
+	}
+	return nil
+}
 func (dubbo *dubboPlugin) GetPorts() []int {
 	return dubbo.ports
 }
 
-func (dubbo *dubboPlugin) init(results protos.Reporter, watcher *procs.ProcessesWatcher, config *dubboConfig) error {
-	dubbo.setFromConfig(config)
-	dubbo.results = results
-	dubbo.watcher = watcher
+func (stream *dubboStream) prepareForNewMessage() {
+	stream.data = nil
+	stream.message = nil
+}
 
-	return nil
+func (dubbo *dubboPlugin) messageComplete(tcptuple *common.TCPTuple, dir uint8, stream *dubboStream) {
+	// all ok, go to next level
+	stream.message.tcpTuple = *tcptuple
+	stream.message.direction = dir
+	stream.message.cmdlineTuple = dubbo.watcher.FindProcessesTupleTCP(tcptuple.IPPort())
+	dubbo.handleDubbo(stream.message)
+	// and reset message
+	stream.prepareForNewMessage()
 }
 
 // 超时时间
@@ -122,86 +170,13 @@ func (dubbo *dubboPlugin) ConnectionTimeout() time.Duration {
 	return dubbo.transactionTimeout
 }
 
-func dubboMessageParser(s *dubboStream) (bool, bool) {
-
-	// 读取Dubbo魔数（0xda, 0xbb）
-	magic := s.readBytes(2)
-	if !bytes.Equal(magic, []byte{0xda, 0xbb}) {
-		return false, false
-	}
-
-	// 读取Dubbo消息类型（请求或响应）
-	messageType := s.readByte()
-	isRequest := messageType == 0
-
-	// 读取请求/响应ID
-	requestID := s.readUint64()
-
-	// 如果是请求，解析服务名和方法名
-	if isRequest {
-		serviceName := s.readString()
-		methodName := s.readString()
-		// 解析请求参数
-		parameters := s.readBytes(len(s.data))
-		// 打印解析结果
-		fmt.Printf("Request ID: %d\nService Name: %s\nMethod Name: %s\nParameters: %s\n", requestID, serviceName, methodName, parameters)
-		return true, false // 表示成功解析请求
-
-	} else {
-		// 如果是响应，解析响应结果
-		// 响应状态，通常为0表示成功
-		status := s.readByte()
-		result := s.readBytes(len(s.data))
-		fmt.Printf("Request ID: %d\nStatus: %d\nResult: %s\n", requestID, status, result)
-		return false, true // 表示成功解析请求
-	}
-
-	return false, false
-}
-
-// 以下是辅助函数，用于读取不同类型的数据
-func (s *dubboStream) readByte() byte {
-	b := s.data[0]
-	s.data = s.data[1:]
-	return b
-}
-
-func (s *dubboStream) readUint64() uint64 {
-	data := s.readBytes(8)
-	return binary.BigEndian.Uint64(data)
-}
-
-func (s *dubboStream) readString() string {
-	length := int(s.readUint32())
-	return string(s.readBytes(length))
-}
-
-func (s *dubboStream) readUint32() uint32 {
-	data := s.readBytes(4)
-	return binary.BigEndian.Uint32(data)
-}
-
-func (stream *dubboStream) prepareForNewMessage() {
-	stream.data = stream.data[stream.parseOffset:]
-	stream.parseOffset = 0
-	stream.message = nil
-}
-
-// 重置解析状态
-func (s *dubboStream) reset() {
-	s.parseOffset = 0
-	s.message = nil
-}
-
 // 处理空包丢包
 func (dubbo *dubboPlugin) GapInStream(tcptuple *common.TCPTuple, dir uint8,
 	nbytes int, private protos.ProtocolData) (priv protos.ProtocolData, drop bool,
 ) {
-
 	if private == nil {
 		return private, false
 	}
-
 	return private, true
 }
 
@@ -212,89 +187,209 @@ func (dubbo *dubboPlugin) ReceivedFin(tcptuple *common.TCPTuple, dir uint8,
 	logp.Info("dubbo", "stream closed...")
 	return private
 }
+func (dubbo *dubboPlugin) handleDubbo(m *dubboMessage) {
+	if m.isRequest {
+		dubbo.receivedRequest(m)
+	} else {
+		dubbo.receivedResponse(m)
+	}
+}
+func (dubbo *dubboPlugin) receivedRequest(msg *dubboMessage) {
+	tuple := msg.tcpTuple
 
-func (s *dubboStream) readBytes(length int) []byte {
-	bytes := s.data[:length]
-	s.data = s.data[length:]
-	return bytes
+	trans := dubbo.getTransaction(msg.reqId)
+	if trans != nil {
+		fmt.Printf("dubbo", "Two requests without response, assuming the old one is oneway")
+		unmatchedRequests.Add(1)
+	}
+
+	trans = &dubboTransaction{
+		tuple: tuple,
+	}
+	dubbo.transactions.Put(msg.reqId, trans)
+
+	trans.ts = msg.ts
+	trans.src, trans.dst = common.MakeEndpointPair(msg.tcpTuple.BaseTuple, msg.cmdlineTuple)
+	if msg.direction == tcp.TCPDirectionReverse {
+		trans.src, trans.dst = trans.dst, trans.src
+	}
+
+	doReq(msg.data, trans)
+	trans.bytesIn = uint64(msg.size)
+
+	if !msg.needResp {
+		trans.bytesOut = 0
+		trans.endTime = msg.ts
+		dubbo.publishTransaction(trans)
+		dubbo.transactions.Delete(msg.reqId)
+		fmt.Printf("dubbo", "Dubbo transaction completed do not need resp, req ID is: %s", msg.reqId)
+	}
+}
+
+func (dubbo *dubboPlugin) receivedResponse(msg *dubboMessage) {
+	trans := dubbo.getTransaction(msg.reqId)
+	if trans == nil {
+		fmt.Printf("dubbo", "Response from unknown transaction. Ignoring: %v", msg.reqId)
+		unmatchedResponses.Add(1)
+		return
+	}
+
+	doRes(msg.data, trans)
+	trans.bytesOut = uint64(msg.size)
+	trans.endTime = msg.ts
+
+	dubbo.publishTransaction(trans)
+	dubbo.transactions.Delete(msg.reqId)
+
+	fmt.Printf("dubbo", "Dubbo transaction completed req ID is: %s", msg.reqId)
 }
 
 // 解析Packet
 func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	dir uint8, private protos.ProtocolData,
 ) protos.ProtocolData {
-	// 解析 Dubbo 数据包的逻辑
-	// 在这里处理 Dubbo 协议的解析逻辑
-	fmt.Println("解析 Dubbo 数据包:", pkt.Payload)
-	if pkt == nil || pkt.Payload == nil {
-		return private
-	}
-	// 获取源IP地址和目标IP地址
-	srcIP := tcptuple.SrcIP.String()
-	dstIP := tcptuple.DstIP.String()
-	// 获取源端口号和目标端口号
-	srcPort := int(tcptuple.SrcPort)
-	dstPort := int(tcptuple.DstPort)
-	fmt.Printf("源IP: %s, 源PORT: %s  <=> 目的IP: %s, 目的PORT: %s", srcIP, srcPort, dstIP, dstPort)
 
-	//获取header。16个字节长度
-	dubboHeader := pkt.Payload[:16]
-
-	//判断是否为dubbo协议
-	if isDubbo(dubboHeader) {
-
-		//获取body的长度
-		ok, length := bodyLength(dubboHeader)
-		if ok {
-
-			//获取body的字节数组内容
-			ok, body := bodyByte(pkt.Payload, length)
-			if ok {
-
-				//判断是请求还是响应
-				if isRequest(dubboHeader) {
-
-					fmt.Println("请求======》")
-					requestId(dubboHeader)
-					doReq(body)
-
-				} else {
-					fmt.Println("《======响应")
-					requestId(dubboHeader)
-					doRes(body)
-				}
-			}
+	priv := dubboPrivateData{}
+	if private != nil {
+		var ok bool
+		priv, ok = private.(dubboPrivateData)
+		if !ok {
+			priv = dubboPrivateData{}
 		}
+	}
+
+	stream := priv.data[dir]
+	if stream == nil {
+		stream = &dubboStream{
+			tcptuple: tcptuple,
+			data:     pkt.Payload,
+			message:  &dubboMessage{ts: pkt.Ts},
+		}
+		priv.data[dir] = stream
+	} else {
+		// concatenate bytes
+		stream.data = append(stream.data, pkt.Payload...)
+		if len(stream.data) > tcp.TCPMaxDataInStream {
+			fmt.Printf("dubbo", "Stream data too large, dropping TCP stream")
+			priv.data[dir] = nil
+			return priv
+		}
+	}
+
+	if stream.message == nil {
+		stream.message = &dubboMessage{ts: pkt.Ts}
+	}
+
+	ok, complete := dubbo.messageParser(priv.data[dir])
+	fmt.Printf("dubbodetailed", "messageParser returned %v %v", ok, complete)
+
+	if !ok {
+		// drop this tcp stream. Will retry parsing with the next
+		// segment in it
+		priv.data[dir] = nil
+		fmt.Printf("dubbo", "Ignore Dubbo message. Drop tcp stream. Try parsing with the next segment")
+		return priv
+	}
+
+	if complete {
+		dubbo.messageComplete(tcptuple, dir, stream)
 	}
 	return private
 }
 
-func doReq(body []byte) {
+func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
+	data := s.data
+	size := len(data)
+	s.message.size = size
+
+	if size > 0 {
+		//获取header。16个字节长度
+		dubboHeader := data[:16]
+		//判断是否为dubbo协议
+		if isDubbo(dubboHeader) {
+
+			ok, reqId := requestId(dubboHeader) //请求ID（作为关联请求响应）
+			if ok {
+				s.message.reqId = reqId
+			}
+
+			ok, length := bodyLength(dubboHeader) //获取body的长度
+			if ok {
+				ok, body := bodyByte(data, length)
+				s.message.data = body
+				if ok {
+					if isRequest(dubboHeader) {
+						s.message.isRequest = true
+						if needResp(dubboHeader) {
+							s.message.needResp = true
+						} else {
+							s.message.needResp = false
+						}
+
+					} else {
+						s.message.isRequest = false
+					}
+					return true, true
+				}
+			}
+		}
+	}
+	return false, false
+}
+
+func convertToObj(data interface{}) (bool, interface{}) {
+	var resultMap map[string]interface{}
+	if m, ok := data.(map[interface{}]interface{}); ok {
+		resultMap = make(map[string]interface{})
+		for k, v := range m {
+			resultMap[k.(string)] = v
+		}
+		return true, resultMap
+
+	} else if m, ok := data.(map[string]interface{}); ok {
+		resultMap = m
+		return true, resultMap
+
+	} else if str, ok := data.(string); ok {
+		return true, str
+	}
+
+	return false, nil
+}
+
+func doReq(body []byte, t *dubboTransaction) {
 	for i := 0; i < 6; i++ {
 		data, bodyUse := useByte(body)
 		if i == 0 {
-			fmt.Printf("req version is: %+v\n", data)
-		} else if i == 1 {
-			fmt.Printf("req service is: %+v\n", data)
-		} else if i == 2 {
-			fmt.Printf("req service version is : %+v\n", data)
-		} else if i == 3 {
-			fmt.Printf("req method is : %+v\n", data)
-		} else if i == 4 {
-			fmt.Printf("req method param type is : %+v\n", data)
-		} else if i == 5 {
-			var resultMap map[string]interface{}
-			if m, ok := data.(map[interface{}]interface{}); ok {
-				resultMap = make(map[string]interface{})
-				for k, v := range m {
-					resultMap[k.(string)] = v
-				}
-			} else if m, ok := data.(map[string]interface{}); ok {
-				resultMap = m
+			if ok, m := convertToObj(data); ok {
+				t.version = m.(string)
 			}
 
-			fmt.Printf("解码后的数据MAP: %+v\n", resultMap)
-			fmt.Printf("req method param is : %+v\n", data)
+		} else if i == 1 {
+			if ok, m := convertToObj(data); ok {
+				t.service = m.(string)
+			}
+
+		} else if i == 2 {
+			if ok, m := convertToObj(data); ok {
+				t.serviceVersion = m.(string)
+			}
+
+		} else if i == 3 {
+			if ok, m := convertToObj(data); ok {
+				t.method = m.(string)
+			}
+
+		} else if i == 4 {
+			if ok, m := convertToObj(data); ok {
+				t.paramType = m.(string)
+			}
+
+		} else if i == 5 {
+			if ok, m := convertToObj(data); ok {
+				t.request = m.(string)
+			}
+
 		}
 		//移除已经使用的字节
 		if len(bodyUse) > 0 {
@@ -303,24 +398,13 @@ func doReq(body []byte) {
 	}
 }
 
-func doRes(body []byte) {
+func doRes(body []byte, t *dubboTransaction) {
 	for i := 0; i < 2; i++ {
 		data, bodyUse := useByte(body)
-		if i == 0 {
-			fmt.Printf("res type is : %+v\n", data)
-		} else if i == 1 {
-			var resultMap map[string]interface{}
-			if m, ok := data.(map[interface{}]interface{}); ok {
-				resultMap = make(map[string]interface{})
-				for k, v := range m {
-					resultMap[k.(string)] = v
-				}
-			} else if m, ok := data.(map[string]interface{}); ok {
-				resultMap = m
+		if i == 1 {
+			if ok, m := convertToObj(data); ok {
+				t.response = m.(string)
 			}
-
-			fmt.Printf("解码后的数据MAP: %+v\n", resultMap)
-			fmt.Printf("res content is : %+v\n", data)
 		}
 		//移除已经使用的字节
 		if len(bodyUse) > 0 {
@@ -338,38 +422,23 @@ func useByte(body []byte) (interface{}, []byte) {
 			encoder.Encode(decodedObject)
 			return decodedObject, encoder.Buffer()
 		} else {
-			fmt.Println("err:", err)
+			logp.Err("can not hessian decoder err:", err)
 		}
 	}
 	return nil, nil
 }
 
-// Called when the parser has identified a full message.
-func (dubbo *dubboPlugin) messageComplete(tcptuple *common.TCPTuple, dir uint8, stream *dubboStream) {
-	// and reset message
-	stream.prepareForNewMessage()
-}
-
-func (dubbo *dubboPlugin) isServerPort(port uint16) bool {
-	for _, sPort := range dubbo.ports {
-		if uint16(sPort) == port {
-			return true
-		}
-	}
-	return false
-}
-
 // 判断是否为dubbo协议（以魔数判断）
 func isDubbo(dubboHeader []byte) bool {
 	if len(dubboHeader) < 2 {
-		fmt.Println("dubboHeader length is less than 2 bytes, unable to read Dubbo magic number")
+		logp.Err("dubboHeader length is less than 2 bytes, unable to read Dubbo magic number")
 		return false
 	}
 	// 读取前2个字节作为 Dubbo 魔数
 	dubboMagic := dubboHeader[:2]
 	// 判断 Dubbo 魔数是否匹配
 	if !bytes.Equal(dubboMagic, []byte{0xda, 0xbb}) {
-		fmt.Printf("Dubbo magic number not found. Got: %x\n", dubboMagic)
+		logp.Err("Dubbo magic number not found. Got: %x\n", dubboMagic)
 		return false
 	}
 	return true
@@ -378,7 +447,7 @@ func isDubbo(dubboHeader []byte) bool {
 // 判断是否为请求/响应
 func isRequest(dubboHeader []byte) bool {
 	if len(dubboHeader) < 2 {
-		fmt.Println("dubboHeader length is less than 3 bytes, unable to read Dubbo req/res flag")
+		logp.Err("dubboHeader length is less than 3 bytes, unable to read Dubbo req/res flag")
 		return false
 	}
 	// Extracting the 3 byte of Dubbo header
@@ -388,31 +457,79 @@ func isRequest(dubboHeader []byte) bool {
 	return reqResFlag == 1
 }
 
+// 请求id，用此可以判断一次请求响应
 func requestId(dubboHeader []byte) (bool, int64) {
 	if len(dubboHeader) < 16 {
-		fmt.Println("dubboHeader length is less than 16 bytes, unable to read body length")
+		logp.Err("dubboHeader length is less than 16 bytes, unable to read reqId length")
 		return false, 0
 	}
 	requestId := int64(binary.BigEndian.Uint64(dubboHeader[4:12]))
-	fmt.Println("req id is:", requestId)
 	return true, requestId
 }
 
 // 获取body的长度
 func bodyLength(dubboHeader []byte) (bool, int) {
 	if len(dubboHeader) < 16 {
-		fmt.Println("dubboHeader length is less than 16 bytes, unable to read body length")
+		logp.Err("dubboHeader length is less than 16 bytes, unable to read body length")
 		return false, 0
 	}
 	messageLength := int(binary.BigEndian.Uint32(dubboHeader[12:16]))
 	return true, messageLength
 }
 
+// 仅在 Req/Res 为1（请求）时才有用，标记是否期望从服务器返回值。如果需要来自服务器的返回值，则设置为1。
+func needResp(dubboHeader []byte) bool {
+	if len(dubboHeader) < 2 {
+		logp.Err("dubboHeader length is less than 3 bytes, unable to read Dubbo two wat flag")
+		return false
+	}
+	// Extracting the 3 byte of Dubbo header
+	flagByte := dubboHeader[2]
+	needRespFlag := (flagByte & 0x40) >> 6
+	//标记是否期望从服务器返回值 1=期望
+	return needRespFlag == 1
+}
+
 func bodyByte(payload []byte, length int) (bool, []byte) {
 	if len(payload) < 16+length {
-		fmt.Println("unable to read body")
+		logp.Err("unable to read body")
 		return false, nil
 	}
 	data := payload[16 : 16+length]
 	return true, data
+}
+func (dubbo *dubboPlugin) publishTransaction(t *dubboTransaction) {
+	if dubbo.results == nil {
+		return
+	}
+
+	fmt.Printf("dubbo", "dubbo.results exists")
+
+	evt, pbf := pb.NewBeatEvent(t.ts)
+	pbf.SetSource(&t.src)
+	pbf.AddIP(t.src.IP)
+	pbf.SetDestination(&t.dst)
+	pbf.AddIP(t.dst.IP)
+	pbf.Source.Bytes = int64(t.bytesIn)
+	pbf.Destination.Bytes = int64(t.bytesOut)
+	pbf.Event.Dataset = "dubbo"
+	pbf.Event.Start = t.ts
+	pbf.Event.End = t.endTime
+	pbf.Network.Transport = "tcp"
+	pbf.Network.Protocol = "dubbo"
+	pbf.Error.Message = t.notes
+
+	fields := evt.Fields
+	fields["type"] = pbf.Event.Dataset
+	fields["service"] = t.service
+	fields["method"] = t.method
+	fields["paramType"] = t.paramType
+	if dubbo.sendRequest {
+		fields["request"] = t.request
+	}
+	if dubbo.sendResponse {
+		fields["response"] = t.response
+	}
+
+	dubbo.results(evt)
 }
