@@ -336,8 +336,8 @@ func convertToObj(data interface{}) (bool, interface{}) {
 		resultMap = m
 		return true, resultMap
 
-	} else if str, ok := data.(string); ok {
-		return true, str
+	} else {
+		return true, fmt.Sprintf("%v", data)
 	}
 	fmt.Printf("convertToObj is err is")
 	return false, nil
