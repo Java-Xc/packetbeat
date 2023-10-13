@@ -339,7 +339,7 @@ func convertToObj(data interface{}) (bool, interface{}) {
 	} else if str, ok := data.(string); ok {
 		return true, str
 	}
-
+	fmt.Printf("convertToObj is err is")
 	return false, nil
 }
 
@@ -373,6 +373,7 @@ func doReq(body []byte, t *dubboTransaction) {
 
 		} else if i == 5 {
 			if ok, m := convertToObj(data); ok {
+				fmt.Printf("dubbo request is : %v", m)
 				t.request = m
 			}
 
