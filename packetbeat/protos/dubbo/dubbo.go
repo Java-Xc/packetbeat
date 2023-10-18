@@ -30,6 +30,7 @@ import (
 	conf "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/monitoring"
+	"reflect"
 	"time"
 )
 
@@ -324,21 +325,14 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 }
 
 func convertToObj(data interface{}) (bool, interface{}) {
-	/*var resultMap map[string]interface{}
-	if m, ok := data.(map[interface{}]interface{}); ok {
-		resultMap = make(map[string]interface{})
-		for k, v := range m {
-			resultMap[k.(string)] = v
-		}
-		return true, resultMap
 
-	} else if m, ok := data.(map[string]interface{}); ok {
-		resultMap = m
-		return true, resultMap
-
+	if reflect.ValueOf(data).IsValid() {
+		str := fmt.Sprintf("%v", data)
+		return true, str
 	} else {
-		return true, fmt.Sprintf("%v", data)
-	}*/
+		return false, ""
+	}
+
 	return true, fmt.Sprintf("%v", data)
 	fmt.Println("convertToObj is err is")
 	return false, nil
@@ -496,8 +490,8 @@ func (dubbo *dubboPlugin) publishTransaction(t *dubboTransaction) {
 
 	fields := evt.Fields
 	fields["type"] = pbf.Event.Dataset
-	fields["service"] = t.service
-	fields["method"] = t.method
+	fields["serviceName"] = t.service
+	fields["methodName"] = t.method
 	fields["paramType"] = t.paramType
 	if dubbo.sendRequest {
 		fields["request"] = t.request
