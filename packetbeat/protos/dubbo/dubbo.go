@@ -242,6 +242,8 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	dir uint8, private protos.ProtocolData,
 ) protos.ProtocolData {
 
+	fmt.Printf("dubbo", "catch it....")
+
 	priv := dubboPrivateData{}
 	if private != nil {
 		var ok bool
