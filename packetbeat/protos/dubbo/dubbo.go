@@ -92,9 +92,6 @@ type dubboPlugin struct {
 
 	results protos.Reporter
 	watcher *procs.ProcessesWatcher
-	// function pointer for mocking
-	handleMysql func(dubbo *dubboPlugin, m *dubboMessage, tcp *common.TCPTuple,
-		dir uint8, raw_msg []byte)
 }
 
 var (
@@ -200,7 +197,7 @@ func (dubbo *dubboPlugin) receivedRequest(msg *dubboMessage) {
 
 	trans := dubbo.getTransaction(msg.reqId)
 	if trans != nil {
-		fmt.Printf("dubbo", "Two requests without response, assuming the old one is oneway")
+		logp.Debug("dubbo", "Two requests without response, assuming the old one is oneway")
 		unmatchedRequests.Add(1)
 	}
 
@@ -222,7 +219,7 @@ func (dubbo *dubboPlugin) receivedRequest(msg *dubboMessage) {
 func (dubbo *dubboPlugin) receivedResponse(msg *dubboMessage) {
 	trans := dubbo.getTransaction(msg.reqId)
 	if trans == nil {
-		fmt.Printf("dubbo", "Response from unknown transaction. Ignoring: %v", msg.reqId)
+		logp.Debug("dubbo", "Response from unknown transaction. Ignoring: %v", msg.reqId)
 		unmatchedResponses.Add(1)
 		return
 	}
@@ -234,15 +231,13 @@ func (dubbo *dubboPlugin) receivedResponse(msg *dubboMessage) {
 	dubbo.publishTransaction(trans)
 	dubbo.transactions.Delete(msg.reqId)
 
-	fmt.Printf("dubbo", "Dubbo transaction completed req ID is: %s", msg.reqId)
+	logp.Debug("dubbo", "Dubbo transaction completed req ID is: %s", msg.reqId)
 }
 
 // 解析Packet
 func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	dir uint8, private protos.ProtocolData,
 ) protos.ProtocolData {
-
-	fmt.Printf("dubbo", "catch it....")
 
 	priv := dubboPrivateData{}
 	if private != nil {
@@ -265,7 +260,7 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 		// concatenate bytes
 		stream.data = append(stream.data, pkt.Payload...)
 		if len(stream.data) > tcp.TCPMaxDataInStream {
-			fmt.Printf("dubbo", "Stream data too large, dropping TCP stream")
+			logp.Debug("dubbo", "Stream data too large, dropping TCP stream")
 			priv.data[dir] = nil
 			return priv
 		}
@@ -276,13 +271,11 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	}
 
 	ok, complete := dubbo.messageParser(priv.data[dir])
-	fmt.Printf("dubbodetailed", "messageParser returned %v %v", ok, complete)
-
 	if !ok {
 		// drop this tcp stream. Will retry parsing with the next
 		// segment in it
 		priv.data[dir] = nil
-		fmt.Printf("dubbo", "Ignore Dubbo message. Drop tcp stream. Try parsing with the next segment")
+		logp.Debug("dubbo", "Ignore Dubbo message. Drop tcp stream. Try parsing with the next segment")
 		return priv
 	}
 
@@ -296,6 +289,11 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 	data := s.data
 	size := len(data)
 	s.message.size = size
+
+	resultString := string(data)
+	fmt.Printf("dubbo", "data is : %v", resultString)
+
+	logp.Debug("dubbo", "data is: %v", data)
 
 	if size > 0 {
 		//获取header。16个字节长度
@@ -327,7 +325,6 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 }
 
 func convertToObj(data interface{}) (bool, interface{}) {
-
 	if reflect.ValueOf(data).IsValid() {
 		str := fmt.Sprintf("%v", data)
 		return true, str
@@ -336,7 +333,7 @@ func convertToObj(data interface{}) (bool, interface{}) {
 	}
 
 	return true, fmt.Sprintf("%v", data)
-	fmt.Println("convertToObj is err is")
+	logp.Debug("dubbo", "convertToObj is err is")
 	return false, nil
 }
 
@@ -370,7 +367,7 @@ func doReq(body []byte, t *dubboTransaction) {
 
 		} else if i == 5 {
 			if ok, m := convertToObj(data); ok {
-				fmt.Printf("dubbo request is : %v", m)
+				logp.Debug("dubbo", "dubbo request is : %v", m)
 				t.request = m
 			}
 
@@ -474,7 +471,7 @@ func (dubbo *dubboPlugin) publishTransaction(t *dubboTransaction) {
 		return
 	}
 
-	fmt.Printf("dubbo", "dubbo.results exists")
+	logp.Debug("dubbo", "dubbo.results exists")
 
 	evt, pbf := pb.NewBeatEvent(t.ts)
 	pbf.SetSource(&t.src)
