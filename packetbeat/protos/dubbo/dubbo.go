@@ -290,11 +290,6 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 	size := len(data)
 	s.message.size = size
 
-	resultString := string(data)
-	fmt.Printf("dubbo", "data is : %v", resultString)
-
-	logp.Debug("dubbo", "data is: %v", data)
-
 	if size > 0 {
 		//获取header。16个字节长度
 		dubboHeader := data[:16]
