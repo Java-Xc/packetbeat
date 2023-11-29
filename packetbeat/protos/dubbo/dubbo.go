@@ -300,6 +300,7 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 		if isDubbo(dubboHeader) {
 
 			ok, reqId := requestId(dubboHeader) //请求ID（作为关联请求响应）
+			fmt.Printf("Dubbo Header reqId: %v\n", reqId)
 			if ok {
 				s.message.reqId = reqId
 			}
