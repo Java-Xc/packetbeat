@@ -462,7 +462,7 @@ func bodyLength(dubboHeader []byte) (bool, int) {
 
 func bodyByte(payload []byte, length int) (bool, []byte) {
 	if len(payload) < 16+length {
-		logp.Err("unable to read body maybe is heartbeat")
+		logp.Err("unable to read body maybe is heatbeat or sub package")
 		return false, nil
 	}
 	data := payload[16 : 16+length]
