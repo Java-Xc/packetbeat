@@ -298,24 +298,21 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 		dubboHeader := data[:16]
 		//判断是否为dubbo协议
 		if isDubbo(dubboHeader) {
-			//排除心跳
-			if !isHeartbeat(dubboHeader) {
-				ok, reqId := requestId(dubboHeader) //请求ID（作为关联请求响应）
+			ok, reqId := requestId(dubboHeader) //请求ID（作为关联请求响应）
+			if ok {
+				s.message.reqId = reqId
+			}
+			ok, length := bodyLength(dubboHeader) //获取body的长度
+			if ok {
+				ok, body := bodyByte(data, length)
+				s.message.data = body
 				if ok {
-					s.message.reqId = reqId
-				}
-				ok, length := bodyLength(dubboHeader) //获取body的长度
-				if ok {
-					ok, body := bodyByte(data, length)
-					s.message.data = body
-					if ok {
-						if isRequest(dubboHeader) {
-							s.message.isRequest = true
-						} else {
-							s.message.isRequest = false
-						}
-						return true, true
+					if isRequest(dubboHeader) {
+						s.message.isRequest = true
+					} else {
+						s.message.isRequest = false
 					}
+					return true, true
 				}
 			}
 
@@ -443,19 +440,6 @@ func isRequest(dubboHeader []byte) bool {
 	return reqResFlag == 1
 }
 
-func isHeartbeat(dubboHeader []byte) bool {
-	if len(dubboHeader) < 2 {
-		logp.Err("dubboHeader length is less than 2 bytes, unable to read Dubbo event")
-		return false
-	}
-	// Extracting the 3 byte of Dubbo header
-	flagByte := dubboHeader[2]
-	flag := (flagByte >> 2) & 0x01
-	//请求=1,响应=0
-	fmt.Printf("Dubbo Header event: %v\n", flag)
-	return flag == 1
-}
-
 // 请求id，用此可以判断一次请求响应
 func requestId(dubboHeader []byte) (bool, int64) {
 	if len(dubboHeader) < 16 {
@@ -478,7 +462,7 @@ func bodyLength(dubboHeader []byte) (bool, int) {
 
 func bodyByte(payload []byte, length int) (bool, []byte) {
 	if len(payload) < 16+length {
-		logp.Err("unable to read body")
+		logp.Err("unable to read body maybe is heartbeat")
 		return false, nil
 	}
 	data := payload[16 : 16+length]
