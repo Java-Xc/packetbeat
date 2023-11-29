@@ -290,6 +290,9 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 	size := len(data)
 	s.message.size = size
 
+	// 打印字节切片中的所有字节
+	fmt.Printf("Dubbo Header Bytes: %v\n", data)
+
 	if size > 0 {
 		//获取header。16个字节长度
 		dubboHeader := data[:16]
