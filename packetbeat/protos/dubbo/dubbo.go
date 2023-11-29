@@ -239,6 +239,10 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	dir uint8, private protos.ProtocolData,
 ) protos.ProtocolData {
 
+	// 获取 Dubbo 连接的唯一标识
+	connectionID := tcptuple.StreamID
+	fmt.Printf("connectionID is : %v\n", connectionID)
+
 	priv := dubboPrivateData{}
 	if private != nil {
 		var ok bool
