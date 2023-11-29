@@ -295,7 +295,7 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 	s.message.size = size
 
 	// 打印字节切片中的所有字节
-	fmt.Printf("Dubbo Header Bytes: %v\n", data)
+	//fmt.Printf("Dubbo Header Bytes: %v\n", data)
 
 	if size > 0 {
 		//获取header。16个字节长度
@@ -319,12 +319,6 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 					return true, true
 				}
 			}
-
-		} else {
-
-			data, _ := useByte(data)
-			str := fmt.Sprintf("%v", data)
-			fmt.Printf("Dubbo body2 : %v\n", str)
 		}
 	}
 	return false, false
