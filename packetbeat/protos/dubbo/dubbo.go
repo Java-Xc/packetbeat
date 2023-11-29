@@ -298,26 +298,32 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 		dubboHeader := data[:16]
 		//判断是否为dubbo协议
 		if isDubbo(dubboHeader) {
-
-			ok, reqId := requestId(dubboHeader) //请求ID（作为关联请求响应）
-			fmt.Printf("Dubbo Header reqId: %v\n", reqId)
-			if ok {
-				s.message.reqId = reqId
-			}
-
-			ok, length := bodyLength(dubboHeader) //获取body的长度
-			if ok {
-				ok, body := bodyByte(data, length)
-				s.message.data = body
+			//排除心跳
+			if !isHeartbeat(dubboHeader) {
+				ok, reqId := requestId(dubboHeader) //请求ID（作为关联请求响应）
 				if ok {
-					if isRequest(dubboHeader) {
-						s.message.isRequest = true
-					} else {
-						s.message.isRequest = false
+					s.message.reqId = reqId
+				}
+				ok, length := bodyLength(dubboHeader) //获取body的长度
+				if ok {
+					ok, body := bodyByte(data, length)
+					s.message.data = body
+					if ok {
+						if isRequest(dubboHeader) {
+							s.message.isRequest = true
+						} else {
+							s.message.isRequest = false
+						}
+						return true, true
 					}
-					return true, true
 				}
 			}
+
+		} else {
+
+			data, _ := useByte(data)
+			str := fmt.Sprintf("%v", data)
+			fmt.Printf("Dubbo body2 : %v\n", str)
 		}
 	}
 	return false, false
@@ -427,7 +433,7 @@ func isDubbo(dubboHeader []byte) bool {
 // 判断是否为请求/响应
 func isRequest(dubboHeader []byte) bool {
 	if len(dubboHeader) < 2 {
-		logp.Err("dubboHeader length is less than 3 bytes, unable to read Dubbo req/res flag")
+		logp.Err("dubboHeader length is less than 2 bytes, unable to read Dubbo req/res flag")
 		return false
 	}
 	// Extracting the 3 byte of Dubbo header
@@ -435,6 +441,19 @@ func isRequest(dubboHeader []byte) bool {
 	reqResFlag := (flagByte & 0x80) >> 7
 	//请求=1,响应=0
 	return reqResFlag == 1
+}
+
+func isHeartbeat(dubboHeader []byte) bool {
+	if len(dubboHeader) < 2 {
+		logp.Err("dubboHeader length is less than 2 bytes, unable to read Dubbo event")
+		return false
+	}
+	// Extracting the 3 byte of Dubbo header
+	flagByte := dubboHeader[2]
+	flag := (flagByte >> 2) & 0x01
+	//请求=1,响应=0
+	fmt.Printf("Dubbo Header event: %v\n", flag)
+	return flag == 1
 }
 
 // 请求id，用此可以判断一次请求响应
