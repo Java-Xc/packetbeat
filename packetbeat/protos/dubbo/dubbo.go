@@ -239,11 +239,14 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	dir uint8, private protos.ProtocolData,
 ) protos.ProtocolData {
 	priv := dubboPrivateData{}
+	fmt.Printf("priv is: %v\n", priv)
 	if private != nil {
 		var ok bool
 		priv, ok = private.(dubboPrivateData)
+		fmt.Printf("priv1 is: %v\n", priv)
 		if !ok {
 			priv = dubboPrivateData{}
+			fmt.Printf("priv2 is: %v\n", priv)
 		}
 	}
 
@@ -259,7 +262,7 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 		//当发生分包时候根据stream添加
 		priv.data[dir].data = append(priv.data[dir].data, pkt.Payload...)
 		if len(priv.data[dir].data) > tcp.TCPMaxDataInStream {
-			logp.Debug("dubbo", "Stream data too large, dropping TCP stream")
+			logp.Debug("dubbo", "Stream data too large, dropping TCP stream the max lentg: %v\", m")
 			priv.data[dir] = nil
 			return priv
 		}
