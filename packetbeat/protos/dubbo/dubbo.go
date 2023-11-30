@@ -151,6 +151,7 @@ func (dubbo *dubboPlugin) GetPorts() []int {
 func (stream *dubboStream) prepareForNewMessage() {
 	stream.data = nil
 	stream.message = nil
+	fmt.Printf("我把长度置空了\n")
 }
 
 func (dubbo *dubboPlugin) messageComplete(tcptuple *common.TCPTuple, dir uint8, stream *dubboStream) {
@@ -257,7 +258,6 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 			data:     pkt.Payload,
 			message:  &dubboMessage{ts: pkt.Ts},
 		}
-
 	} else {
 		//当发生分包时候根据stream添加
 		priv.data[dir].data = append(priv.data[dir].data, pkt.Payload...)
@@ -270,6 +270,7 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 
 	stream := priv.data[dir]
 	for len(stream.data) > 0 {
+		fmt.Printf("我进入循环，因为长度大于0 \n")
 		if stream.message == nil {
 			stream.message = &dubboMessage{ts: pkt.Ts}
 		}
