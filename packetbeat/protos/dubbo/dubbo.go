@@ -151,7 +151,6 @@ func (dubbo *dubboPlugin) GetPorts() []int {
 func (stream *dubboStream) prepareForNewMessage() {
 	stream.data = nil
 	stream.message = nil
-	fmt.Printf("我把长度置空了\n")
 }
 
 func (dubbo *dubboPlugin) messageComplete(tcptuple *common.TCPTuple, dir uint8, stream *dubboStream) {
@@ -240,14 +239,11 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	dir uint8, private protos.ProtocolData,
 ) protos.ProtocolData {
 	priv := dubboPrivateData{}
-	fmt.Printf("priv is: %v\n", priv)
 	if private != nil {
 		var ok bool
 		priv, ok = private.(dubboPrivateData)
-		fmt.Printf("priv1 is: %v\n", priv)
 		if !ok {
 			priv = dubboPrivateData{}
-			fmt.Printf("priv2 is: %v\n", priv)
 		}
 	}
 
@@ -269,22 +265,17 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	}
 
 	stream := priv.data[dir]
-	for len(stream.data) > 0 {
-		fmt.Printf("我进入循环，因为长度大于0 \n")
-		if stream.message == nil {
-			stream.message = &dubboMessage{ts: pkt.Ts}
-		}
-		ok, complete := dubbo.messageParser(priv.data[dir])
-		if !ok {
-			priv.data[dir] = nil
-			logp.Debug("dubbo", "Ignore Dubbo message. Drop tcp stream. Try parsing with the next segment")
-			return priv
-		}
-		if complete {
-			dubbo.messageComplete(tcptuple, dir, stream)
-		} else {
-			break
-		}
+	if stream.message == nil {
+		stream.message = &dubboMessage{ts: pkt.Ts}
+	}
+	ok, complete := dubbo.messageParser(priv.data[dir])
+	if !ok {
+		priv.data[dir] = nil
+		logp.Debug("dubbo", "Ignore Dubbo message. Drop tcp stream. Try parsing with the next segment")
+		return priv
+	}
+	if complete {
+		dubbo.messageComplete(tcptuple, dir, stream)
 	}
 	return priv
 }
