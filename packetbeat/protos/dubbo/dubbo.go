@@ -247,6 +247,8 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 		}
 	}
 
+	fmt.Printf("数据流向: %v\n", dir)
+
 	//根据数据流量创建stream
 	if priv.data[dir] == nil {
 		priv.data[dir] = &dubboStream{
