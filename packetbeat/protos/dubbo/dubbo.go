@@ -291,28 +291,35 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 		dubboHeader := data[:16]
 		//判断是否为dubbo协议
 		if isDubbo(dubboHeader) {
-			ok, reqId := requestId(dubboHeader) //请求ID（作为关联请求响应）
-			if ok {
-				s.message.reqId = reqId
-			}
-			ok, length := bodyLength(dubboHeader) //获取body的长度
-			if ok {
-				//判断数据是否足够
-				if isCompleteData(data, length) {
-					ok, body := bodyByte(data, length)
-					s.message.data = body
-					if ok {
-						if isRequest(dubboHeader) {
-							s.message.isRequest = true
-						} else {
-							s.message.isRequest = false
-						}
-						return true, true
-					}
-				} else {
-					//等待下一段数据
-					return true, false
+			//判断是否属于心跳
+			if !isHeartbeat(dubboHeader) {
+				fmt.Printf("我不是心跳\n")
+				ok, reqId := requestId(dubboHeader) //请求ID（作为关联请求响应）
+				if ok {
+					s.message.reqId = reqId
 				}
+				ok, length := bodyLength(dubboHeader) //获取body的长度
+				if ok {
+					//判断数据是否足够
+					if isCompleteData(data, length) {
+						ok, body := bodyByte(data, length)
+						s.message.data = body
+						if ok {
+							if isRequest(dubboHeader) {
+								s.message.isRequest = true
+							} else {
+								s.message.isRequest = false
+							}
+							return true, true
+						}
+					} else {
+						//等待下一段数据
+						return true, false
+					}
+				}
+			} else {
+				fmt.Printf("我是心跳\n")
+				return false, true
 			}
 		}
 	}
@@ -437,6 +444,19 @@ func isRequest(dubboHeader []byte) bool {
 	reqResFlag := (flagByte & 0x80) >> 7
 	//请求=1,响应=0
 	return reqResFlag == 1
+}
+
+// 判断是否为心跳
+func isHeartbeat(dubboHeader []byte) bool {
+	if len(dubboHeader) < 2 {
+		logp.Err("dubboHeader length is less than 2 bytes, unable to read Dubbo event")
+		return false
+	}
+	// Extracting the 3 byte of Dubbo header
+	flagByte := dubboHeader[2]
+	flag := (flagByte & 0x20) >> 5
+	//1=心跳
+	return flag == 1
 }
 
 // 请求id，用此可以判断一次请求响应
