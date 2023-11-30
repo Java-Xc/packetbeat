@@ -80,6 +80,12 @@ type dubboTransaction struct {
 	response interface{}
 }
 
+type subpackage struct {
+	data   []byte
+	length int
+	reqId  int64
+}
+
 type dubboPlugin struct {
 	// config
 	ports []int
@@ -87,8 +93,9 @@ type dubboPlugin struct {
 	sendRequest  bool
 	sendResponse bool
 
-	transactions       *common.Cache
-	transactionTimeout time.Duration
+	transactions             *common.Cache
+	transactionTimeout       time.Duration
+	incompleteResponsesArray *[]subpackage
 
 	results protos.Reporter
 	watcher *procs.ProcessesWatcher
@@ -126,6 +133,7 @@ func (dubbo *dubboPlugin) init(results protos.Reporter, watcher *procs.Processes
 	dubbo.setFromConfig(config)
 	dubbo.transactions = common.NewCache(dubbo.transactionTimeout, protos.DefaultTransactionHashSize)
 	dubbo.transactions.StartJanitor(dubbo.transactionTimeout)
+	dubbo.incompleteResponsesArray = &[]subpackage{}
 	dubbo.watcher = &procs.ProcessesWatcher{}
 	dubbo.results = results
 	dubbo.watcher = watcher
@@ -238,11 +246,6 @@ func (dubbo *dubboPlugin) receivedResponse(msg *dubboMessage) {
 func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 	dir uint8, private protos.ProtocolData,
 ) protos.ProtocolData {
-
-	// 获取 Dubbo 连接的唯一标识
-	connectionID := tcptuple.StreamID
-	fmt.Printf("connectionID is : %v\n", connectionID)
-
 	priv := dubboPrivateData{}
 	if private != nil {
 		var ok bool
@@ -260,7 +263,10 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 			message:  &dubboMessage{ts: pkt.Ts},
 		}
 		priv.data[dir] = stream
+		fmt.Printf("初始化stream: %v\n", stream)
+
 	} else {
+		fmt.Printf("不是空的stream: %v\n", stream)
 		// concatenate bytes
 		stream.data = append(stream.data, pkt.Payload...)
 		if len(stream.data) > tcp.TCPMaxDataInStream {
@@ -294,9 +300,6 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 	size := len(data)
 	s.message.size = size
 
-	// 打印字节切片中的所有字节
-	//fmt.Printf("Dubbo Header Bytes: %v\n", data)
-
 	if size > 0 {
 		//获取header。16个字节长度
 		dubboHeader := data[:16]
@@ -308,20 +311,62 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 			}
 			ok, length := bodyLength(dubboHeader) //获取body的长度
 			if ok {
-				ok, body := bodyByte(data, length)
-				s.message.data = body
-				if ok {
-					if isRequest(dubboHeader) {
-						s.message.isRequest = true
-					} else {
-						s.message.isRequest = false
+				//判定长度是否足够，发生分包
+				if isCompleteResponse(data, length) {
+					ok, body := bodyByte(data, length)
+					s.message.data = body
+					if ok {
+						if isRequest(dubboHeader) {
+							s.message.isRequest = true
+						} else {
+							s.message.isRequest = false
+						}
+						return true, true
 					}
-					return true, true
+
+				} else {
+					//newData := subpackage{
+					//	data:   data[16:],
+					//	length: length,
+					//	reqId:  reqId,
+					//}
+					//*dubbo.incompleteResponsesArray = append(*dubbo.incompleteResponsesArray, newData)
+					//return ok, false
 				}
 			}
+
+		} else {
+
+			//for _, obj := range *dubbo.incompleteResponsesArray {
+			//
+			//	//当前总长度
+			//	size = size + obj.length
+			//
+			//	append(obj.data, data...)
+			//
+			//
+			//
+			//	fmt.Printf("Data: %v, Length: %d, ReqId: %d\n", obj.data, obj.length, obj.reqId)
+			//}
+			//
+			//incompleteData, exists := dubbo.incompleteResponses[connectionIdentifier]
+			//if exists {
+			//
+			//}
+			//
+			//incompleteData = append(incompleteData, data)
 		}
 	}
 	return false, false
+}
+
+// 判断是否为完整响应
+func isCompleteResponse(data []byte, length int) bool {
+	//body := data[16:]
+	//fmt.Printf("Dubbo body: %v\n", body)
+	//fmt.Printf("Dubbo body length: %v\n", length)
+	//return len(body) == length
+	return true
 }
 
 func convertToObj(data interface{}) (bool, interface{}) {
