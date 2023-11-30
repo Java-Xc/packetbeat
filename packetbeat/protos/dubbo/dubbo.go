@@ -286,7 +286,7 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 			break
 		}
 	}
-	return private
+	return priv
 }
 
 func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
