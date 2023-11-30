@@ -284,7 +284,6 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 	data := s.data
 	size := len(data)
 	s.message.size = size
-	fmt.Printf("data is: %v\n", data)
 
 	if size > 0 {
 		//获取header。16个字节长度
@@ -293,7 +292,6 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 		if isDubbo(dubboHeader) {
 			//判断是否属于心跳
 			if !isHeartbeat(dubboHeader) {
-				fmt.Printf("我不是心跳\n")
 				ok, reqId := requestId(dubboHeader) //请求ID（作为关联请求响应）
 				if ok {
 					s.message.reqId = reqId
@@ -318,7 +316,6 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 					}
 				}
 			} else {
-				fmt.Printf("我是心跳\n")
 				return false, true
 			}
 		}
