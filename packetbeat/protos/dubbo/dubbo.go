@@ -284,6 +284,7 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 	data := s.data
 	size := len(data)
 	s.message.size = size
+	fmt.Printf("data is: %v\n", data)
 
 	if size > 0 {
 		//获取header。16个字节长度
