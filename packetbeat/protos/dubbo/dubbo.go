@@ -260,7 +260,7 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 		//当发生分包时候根据stream添加
 		priv.data[dir].data = append(priv.data[dir].data, pkt.Payload...)
 		if len(priv.data[dir].data) > tcp.TCPMaxDataInStream {
-			logp.Debug("dubbo", "Stream data too large, dropping TCP stream")
+			fmt.Printf("dubbo", "Stream data too large, dropping TCP stream")
 			priv.data[dir] = nil
 			return priv
 		}
@@ -317,7 +317,7 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 					}
 				} else {
 					//等待下一段数据
-					fmt.Printf("长度不够，需要等待")
+					fmt.Printf("长度不够，需要等待\n")
 					return true, false
 				}
 			}
