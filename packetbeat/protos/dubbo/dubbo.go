@@ -247,8 +247,6 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 		}
 	}
 
-	fmt.Printf("数据流向: %v\n", dir)
-
 	//根据数据流量创建stream
 	if priv.data[dir] == nil {
 		priv.data[dir] = &dubboStream{
@@ -256,17 +254,15 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 			data:     pkt.Payload,
 			message:  &dubboMessage{ts: pkt.Ts},
 		}
-		fmt.Printf("初始化stream: %v\n", priv.data[dir].data)
 
 	} else {
 		//当发生分包时候根据stream添加
 		priv.data[dir].data = append(priv.data[dir].data, pkt.Payload...)
 		if len(priv.data[dir].data) > tcp.TCPMaxDataInStream {
-			fmt.Printf("dubbo", "Stream data too large, dropping TCP stream")
+			logp.Debug("dubbo", "Stream data too large, dropping TCP stream")
 			priv.data[dir] = nil
 			return priv
 		}
-		fmt.Printf("追加内容stream: %v\n", priv.data[dir].data)
 	}
 
 	stream := priv.data[dir]
@@ -319,7 +315,6 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 					}
 				} else {
 					//等待下一段数据
-					fmt.Printf("长度不够，需要等待\n")
 					return true, false
 				}
 			}
@@ -331,8 +326,6 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 // 是否完整数据
 func isCompleteData(data []byte, length int) bool {
 	body := data[16:] //内容
-	fmt.Printf("Dubbo body length: %v\n", len(body))
-	fmt.Printf("Dubbo body2 length: %v\n", length)
 	return len(body) == length
 }
 
