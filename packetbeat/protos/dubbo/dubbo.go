@@ -404,8 +404,22 @@ func doReq(body []byte, t *dubboTransaction) {
 			if ok, m := convertToObj(data); ok {
 				if generic {
 					t.request = m
+					fmt.Printf("泛化请求参数1: %v\n", t.request)
 				}
 			}
+			if ok, m := convertToObj(data); ok {
+				if generic {
+					t.request = m
+					fmt.Printf("泛化请求参数2: %v\n", t.request)
+				}
+			}
+			if ok, m := convertToObj(data); ok {
+				if generic {
+					t.request = m
+					fmt.Printf("泛化请求参数3: %v\n", t.request)
+				}
+			}
+
 		}
 		//移除已经使用的字节
 		if len(bodyUse) > 0 {
