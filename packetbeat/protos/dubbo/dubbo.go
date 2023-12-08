@@ -351,7 +351,7 @@ func doReq(body []byte, t *dubboTransaction) {
 	var num = 6
 	var generic bool = false
 	if strings.Contains(strBody, "$invoke") {
-		num = 8
+		num = 9
 		generic = true
 	}
 
@@ -400,7 +400,7 @@ func doReq(body []byte, t *dubboTransaction) {
 					t.paramType = m.(string)
 				}
 			}
-		} else if i == 7 {
+		} else if i == 8 {
 			if ok, m := convertToObj(data); ok {
 				if generic {
 					t.request = m
