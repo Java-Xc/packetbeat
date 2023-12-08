@@ -31,6 +31,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/monitoring"
 	"reflect"
+	"strings"
 	"time"
 )
 
@@ -347,7 +348,14 @@ func doReq(body []byte, t *dubboTransaction) {
 	strBody := string(body)
 	fmt.Printf("完整数据: %v\n", strBody)
 
-	for i := 0; i < 6; i++ {
+	var num = 6
+	var generic bool = false
+	if strings.Contains(strBody, "$invoke") {
+		num = 7
+		generic = true
+	}
+
+	for i := 0; i < num; i++ {
 		data, bodyUse := useByte(body)
 		if i == 0 {
 			if ok, m := convertToObj(data); ok {
@@ -366,20 +374,34 @@ func doReq(body []byte, t *dubboTransaction) {
 
 		} else if i == 3 {
 			if ok, m := convertToObj(data); ok {
-				t.method = m.(string)
+				if !generic {
+					t.method = m.(string)
+				}
 			}
 
 		} else if i == 4 {
 			if ok, m := convertToObj(data); ok {
-				t.paramType = m.(string)
+				if generic {
+					t.method = m.(string)
+				} else {
+					t.paramType = m.(string)
+				}
 			}
 
 		} else if i == 5 {
 			if ok, m := convertToObj(data); ok {
-				logp.Debug("dubbo", "dubbo request is : %v", m)
-				t.request = m
+				if generic {
+					t.paramType = m.(string)
+				} else {
+					t.request = m
+				}
 			}
-
+		} else if i == 6 {
+			if ok, m := convertToObj(data); ok {
+				if generic {
+					t.request = m
+				}
+			}
 		}
 		//移除已经使用的字节
 		if len(bodyUse) > 0 {
