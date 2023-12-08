@@ -344,7 +344,8 @@ func convertToObj(data interface{}) (bool, interface{}) {
 
 func doReq(body []byte, t *dubboTransaction) {
 
-	fmt.Printf("完整数据: %v\n", body)
+	strBody := string(body)
+	fmt.Printf("完整数据: %v\n", strBody)
 
 	for i := 0; i < 6; i++ {
 		data, bodyUse := useByte(body)
