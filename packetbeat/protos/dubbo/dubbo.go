@@ -348,77 +348,87 @@ func doReq(body []byte, t *dubboTransaction) {
 	strBody := string(body)
 	fmt.Printf("完整数据: %v\n", strBody)
 
-	var num = 6
-	var generic bool = false
 	if strings.Contains(strBody, "$invoke") {
-		num = 11
-		generic = true
+		doGenericReq(0, body, t)
+	} else {
+		doNormalReq(0, body, t)
 	}
+}
 
-	for i := 0; i < num; i++ {
+func doNormalReq(i int, body []byte, t *dubboTransaction) {
+	for {
 		data, bodyUse := useByte(body)
 		if i == 0 {
 			if ok, m := convertToObj(data); ok {
 				t.version = m.(string)
 			}
-
 		} else if i == 1 {
 			if ok, m := convertToObj(data); ok {
 				t.service = m.(string)
 			}
-
 		} else if i == 2 {
 			if ok, m := convertToObj(data); ok {
 				t.serviceVersion = m.(string)
 			}
-
 		} else if i == 3 {
 			if ok, m := convertToObj(data); ok {
-				if !generic {
-					t.method = m.(string)
-				}
+				t.method = m.(string)
 			}
-
 		} else if i == 4 {
 			if ok, m := convertToObj(data); ok {
-				if !generic {
-					t.paramType = m.(string)
-				}
+				t.paramType = m.(string)
 			}
-
 		} else if i == 5 {
 			if ok, m := convertToObj(data); ok {
-				if generic {
-					t.method = m.(string)
-				} else {
-					t.request = m
-				}
+				t.request = m
+			}
+			i = -1 //标识可以退出
+		}
+		//移除已经使用的字节
+		if len(bodyUse) > 0 {
+			body = body[len(bodyUse):]
+		}
+		if i == -1 {
+			break
+		}
+		i++
+	}
+}
+
+// 泛化调用解析
+func doGenericReq(i int, body []byte, t *dubboTransaction) {
+	var paramValues []string
+	for {
+		data, bodyUse := useByte(body)
+		if i == 0 {
+			if ok, m := convertToObj(data); ok {
+				t.version = m.(string)
+			}
+		} else if i == 1 {
+			if ok, m := convertToObj(data); ok {
+				t.service = m.(string)
+			}
+		} else if i == 2 {
+			if ok, m := convertToObj(data); ok {
+				t.serviceVersion = m.(string)
+			}
+		} else if i == 5 {
+			if ok, m := convertToObj(data); ok {
+				t.method = m.(string)
 			}
 		} else if i == 6 {
 			if ok, m := convertToObj(data); ok {
-				if generic {
-					t.paramType = m.(string)
-				}
+				t.paramType = m.(string)
 			}
-		} else if i == 8 {
+		} else if i >= 8 {
 			if ok, m := convertToObj(data); ok {
-				if generic {
-					t.request = m
-					fmt.Printf("泛化请求参数1: %v\n", t.request)
-				}
-			}
-		} else if i == 9 {
-			if ok, m := convertToObj(data); ok {
-				if generic {
-					t.request = m
-					fmt.Printf("泛化请求参数2: %v\n", t.request)
-				}
-			}
-		} else if i == 10 {
-			if ok, m := convertToObj(data); ok {
-				if generic {
-					t.request = m
-					fmt.Printf("泛化请求参数3: %v\n", t.request)
+				if strings.Contains(m.(string), "interface:") {
+					i = -1 //标识可以退出
+					paramValue := strings.Join(paramValues, ",")
+					t.request = paramValue
+
+				} else {
+					paramValues = append(paramValues, m.(string))
 				}
 			}
 		}
@@ -426,6 +436,10 @@ func doReq(body []byte, t *dubboTransaction) {
 		if len(bodyUse) > 0 {
 			body = body[len(bodyUse):]
 		}
+		if i == -1 {
+			break
+		}
+		i++
 	}
 }
 
