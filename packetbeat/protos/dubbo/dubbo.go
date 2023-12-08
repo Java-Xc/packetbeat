@@ -351,7 +351,7 @@ func doReq(body []byte, t *dubboTransaction) {
 	var num = 6
 	var generic bool = false
 	if strings.Contains(strBody, "$invoke") {
-		num = 7
+		num = 8
 		generic = true
 	}
 
@@ -381,9 +381,7 @@ func doReq(body []byte, t *dubboTransaction) {
 
 		} else if i == 4 {
 			if ok, m := convertToObj(data); ok {
-				if generic {
-					t.method = m.(string)
-				} else {
+				if !generic {
 					t.paramType = m.(string)
 				}
 			}
@@ -391,12 +389,18 @@ func doReq(body []byte, t *dubboTransaction) {
 		} else if i == 5 {
 			if ok, m := convertToObj(data); ok {
 				if generic {
-					t.paramType = m.(string)
+					t.method = m.(string)
 				} else {
 					t.request = m
 				}
 			}
 		} else if i == 6 {
+			if ok, m := convertToObj(data); ok {
+				if generic {
+					t.paramType = m.(string)
+				}
+			}
+		} else if i == 7 {
 			if ok, m := convertToObj(data); ok {
 				if generic {
 					t.request = m
