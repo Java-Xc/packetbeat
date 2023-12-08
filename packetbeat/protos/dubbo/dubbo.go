@@ -423,13 +423,15 @@ func doGenericReq(i int, body []byte, t *dubboTransaction) {
 		} else if i >= 8 {
 			if ok, m := convertToObj(data); ok {
 				if strings.Contains(m.(string), "interface:") {
-					i = -1 //标识可以退出
+					i = -1
 					paramValue := strings.Join(paramValues, ",")
 					t.request = paramValue
 
 				} else {
 					paramValues = append(paramValues, m.(string))
 				}
+			} else {
+				i = -1
 			}
 		}
 		//移除已经使用的字节
