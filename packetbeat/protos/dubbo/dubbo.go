@@ -31,7 +31,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/monitoring"
 	"reflect"
-	"strings"
 	"time"
 )
 
@@ -367,21 +366,12 @@ func doReq(body []byte, t *dubboTransaction) {
 
 		} else if i == 3 {
 			if ok, m := convertToObj(data); ok {
-				//证明是泛化调用
-				if strings.Contains(strBody, "$invoke") {
-					t.paramType = m.(string)
-				} else {
-					t.method = m.(string)
-				}
+				t.method = m.(string)
 			}
 
 		} else if i == 4 {
 			if ok, m := convertToObj(data); ok {
-				if strings.Contains(strBody, "$invoke") {
-					t.method = m.(string)
-				} else {
-					t.paramType = m.(string)
-				}
+				t.paramType = m.(string)
 			}
 
 		} else if i == 5 {
