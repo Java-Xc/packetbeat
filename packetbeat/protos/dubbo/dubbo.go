@@ -259,7 +259,7 @@ func (dubbo *dubboPlugin) Parse(pkt *protos.Packet, tcptuple *common.TCPTuple,
 		//当发生分包时候根据stream添加
 		priv.data[dir].data = append(priv.data[dir].data, pkt.Payload...)
 		if len(priv.data[dir].data) > tcp.TCPMaxDataInStream {
-			logp.Debug("dubbo", "Stream data too large, dropping TCP stream the max lentg: %v\", m")
+			logp.Err("dubbo", "Stream data too large, dropping TCP stream the max lentg: %v\", m")
 			priv.data[dir] = nil
 			return priv
 		}
@@ -285,6 +285,9 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 	data := s.data
 	size := len(data)
 	s.message.size = size
+
+	strBody := string(data)
+	fmt.Printf("完整数据1: %v\n", strBody)
 
 	if size > 0 {
 		//获取header。16个字节长度
