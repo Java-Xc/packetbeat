@@ -345,6 +345,8 @@ func convertToObj(data interface{}) (bool, interface{}) {
 
 func doReq(body []byte, t *dubboTransaction) {
 	strBody := string(body)
+	fmt.Printf("完整数据: %v\n", strBody)
+
 	if strings.Contains(strBody, "$invoke") {
 		doGenericReq(0, body, t)
 	} else {
