@@ -286,9 +286,6 @@ func (dubbo *dubboPlugin) messageParser(s *dubboStream) (bool, bool) {
 	size := len(data)
 	s.message.size = size
 
-	strBody := string(data)
-	fmt.Printf("完整数据1: %v\n", strBody)
-
 	if size > 0 {
 		//获取header。16个字节长度
 		dubboHeader := data[:16]
@@ -348,8 +345,6 @@ func convertToObj(data interface{}) (bool, interface{}) {
 
 func doReq(body []byte, t *dubboTransaction) {
 	strBody := string(body)
-	fmt.Printf("完整数据: %v\n", strBody)
-
 	if strings.Contains(strBody, "$invoke") {
 		doGenericReq(0, body, t)
 	} else {
