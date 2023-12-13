@@ -345,6 +345,8 @@ func convertToObj(data interface{}) (bool, interface{}) {
 
 func doReq(body []byte, t *dubboTransaction) {
 	strBody := string(body)
+	fmt.Printf("dubbo request data is: %v\n", strBody)
+
 	if strings.Contains(strBody, "$invoke") {
 		doGenericReq(0, body, t)
 	} else {
@@ -383,7 +385,11 @@ func doNormalReq(i int, body []byte, t *dubboTransaction) {
 		}
 		//移除已经使用的字节
 		if len(bodyUse) > 0 {
-			body = body[len(bodyUse):]
+			if len(body) < len(bodyUse) {
+				i = -1
+			} else {
+				body = body[len(bodyUse):]
+			}
 		}
 		if i == -1 {
 			break
@@ -433,7 +439,11 @@ func doGenericReq(i int, body []byte, t *dubboTransaction) {
 		}
 		//移除已经使用的字节
 		if len(bodyUse) > 0 {
-			body = body[len(bodyUse):]
+			if len(body) < len(bodyUse) {
+				i = -1
+			} else {
+				body = body[len(bodyUse):]
+			}
 		}
 		if i == -1 {
 			break
@@ -443,6 +453,9 @@ func doGenericReq(i int, body []byte, t *dubboTransaction) {
 }
 
 func doRes(body []byte, t *dubboTransaction) {
+	strBody := string(body)
+	fmt.Printf("dubbo response data is: %v\n", strBody)
+
 	for i := 0; i < 2; i++ {
 		data, bodyUse := useByte(body)
 		if i == 1 {
@@ -452,7 +465,11 @@ func doRes(body []byte, t *dubboTransaction) {
 		}
 		//移除已经使用的字节
 		if len(bodyUse) > 0 {
-			body = body[len(bodyUse):]
+			if len(body) < len(bodyUse) {
+				i = -1
+			} else {
+				body = body[len(bodyUse):]
+			}
 		}
 	}
 }
